@@ -29,3 +29,38 @@ by reading their source directly.
 five repos on purpose, so any agent persona works the same way regardless of
 which repo it's invoked in. Once a target platform is chosen, update this
 file with real commands and architecture notes.
+
+## Git
+
+Do not commit changes in this repo automatically — even when using
+atomic-commit or similar workflows. Only commit when the user explicitly
+asks for it.
+
+## Code style
+
+Always put comments in code (manifests, scripts) so it is understandable by
+a human reader — explain what non-obvious blocks do, not just restate the
+syntax.
+
+## Environment files
+
+Always use `.env.local` for local config — never create or reintroduce a
+`.env.example`/`.env.sample` template file. `.env.local` already exists in
+this repo (gitignored) and holds the real placeholder values directly; if a
+new env var is needed, add it straight to `.env.local` (with a comment
+explaining it) rather than adding a separate example file for someone to
+copy from.
+
+## Gitignore
+
+Always ensure a `.gitignore` exists in this repo — never let it be
+deleted or skipped when scaffolding. It has two parts:
+
+- A **shared baseline** kept identical (word-for-word) across all five
+  `stock-*` repos: `.env`, `.env.local`, `.claude/settings.local.json`. If
+  you add an entry to this shared baseline in any one repo, add the same
+  line to the other four repos' `.gitignore` files too, so they stay in
+  sync.
+- **Repo-specific entries** below the baseline, once a platform/tool is
+  chosen (e.g. Terraform's `.terraform/`, a kubeconfig, etc.) — these will
+  differ per repo's tooling and should NOT be copied to siblings.
