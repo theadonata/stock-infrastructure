@@ -1,0 +1,6 @@
+# Shared baseline — kept identical across all stock-* repos, see CLAUDE.md
+.env
+.env.local
+.claude/settings.local.json
+
+# Repo-specific — none yet (no platform/tool chosen)
