@@ -41,6 +41,12 @@ Never push directly to the `main` branch, even when explicitly asked to
 request. Always push to a new branch and open a PR instead, across all
 five `stock-*` repos.
 
+Always branch off `main` for new work, and sync first: run
+`git fetch origin && git merge --ff-only origin/main` (or
+`git pull --ff-only`) before creating the branch — cutting a branch from a
+stale local `main` produces a PR with a stale diff or spurious merge
+conflicts.
+
 ## Code style
 
 Always put comments in code (manifests, scripts) so it is understandable by
@@ -55,6 +61,14 @@ this repo (gitignored) and holds the real placeholder values directly; if a
 new env var is needed, add it straight to `.env.local` (with a comment
 explaining it) rather than adding a separate example file for someone to
 copy from.
+
+MCP servers configured in `.mcp.json` that reference `${VAR_NAME}` (e.g.
+the `github` server needs `GITHUB_PERSONAL_ACCESS_TOKEN`) read from the
+process environment, which is not populated automatically. Before using
+such an MCP server or making authenticated GitHub calls, read the value
+out of this repo's `.env.local` (e.g.
+`grep GITHUB_PERSONAL_ACCESS_TOKEN .env.local`) and export it for the
+current shell — don't assume it's already set.
 
 ## Gitignore
 
