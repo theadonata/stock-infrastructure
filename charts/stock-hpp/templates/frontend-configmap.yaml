@@ -1,0 +1,13 @@
+# Runtime API_BASE_URL for the frontend — Fix B in gitops-plan.md. Requires
+# stock-frontend's docker-entrypoint.sh (envsubst -> /config.js) and
+# client.ts's window.__APP_CONFIG__ read to have landed in that repo; this
+# ConfigMap is the infra-side half of that fix (see frontend-deployment.yaml
+# for how it's wired into the container as an env var).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-frontend-config
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+data:
+  API_BASE_URL: {{ .Values.frontend.config.apiBaseUrl | quote }}

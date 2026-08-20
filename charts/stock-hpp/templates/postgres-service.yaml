@@ -1,0 +1,17 @@
+# Headless (clusterIP: None) so the StatefulSet pod gets a stable DNS name
+# (<name>-postgres-0.<name>-postgres) rather than a load-balanced ClusterIP
+# — the standard pattern for a single-writer database pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-postgres
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "stock-hpp.selectorLabels" (dict "component" "postgres" "Chart" .Chart) | nindent 4 }}
+  ports:
+    - name: postgres
+      port: {{ .Values.postgres.port }}
+      targetPort: postgres

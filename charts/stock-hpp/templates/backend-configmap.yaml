@@ -1,0 +1,14 @@
+# Non-secret backend env vars. DATABASE_URL and JWT_SECRET are deliberately
+# not here — they come from the SealedSecret referenced by .Values.secretName
+# (see backend-deployment.yaml's secretKeyRef and ../../secrets/<env>/).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-backend-config
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+data:
+  JWT_ALGORITHM: {{ .Values.backend.env.JWT_ALGORITHM | quote }}
+  ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.backend.env.ACCESS_TOKEN_EXPIRE_MINUTES | quote }}
+  PROJECT_NAME: {{ .Values.backend.env.PROJECT_NAME | quote }}
+  CORS_ORIGINS: {{ .Values.backend.env.CORS_ORIGINS | quote }}

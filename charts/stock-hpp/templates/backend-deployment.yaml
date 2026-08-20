@@ -1,0 +1,64 @@
+# Runs plain uvicorn only (stock-backend/Dockerfile's own CMD, line 61) —
+# migrations are NOT run here. They run once per release in
+# backend-migrate-job.yaml via Argo CD's PreSync hook, which completes before
+# this Deployment's rolling update starts. Running `alembic upgrade head` in
+# this pod's command (copying docker-compose.yml's dev command verbatim)
+# would race under replicaCount > 1. See gitops-plan.md Fix A.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-backend
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+    {{- include "stock-hpp.selectorLabels" (dict "component" "backend" "Chart" .Chart) | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "stock-hpp.selectorLabels" (dict "component" "backend" "Chart" .Chart) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stock-hpp.selectorLabels" (dict "component" "backend" "Chart" .Chart) | nindent 8 }}
+    spec:
+      # Matches stock-backend/Dockerfile's non-root `appuser` (uid 1000).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "stock-hpp.fullname" . }}-backend-config
+          env:
+            # Pulled from the SealedSecret decrypted by the Sealed Secrets
+            # controller — see ../../secrets/<env>/backend-secrets.sealed.yaml.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: JWT_SECRET
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}

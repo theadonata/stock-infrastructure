@@ -1,0 +1,13 @@
+apiVersion: v2
+name: stock-hpp
+description: >-
+  Umbrella chart for the Stock/HPP stack (backend API, frontend SPA,
+  in-cluster Postgres). Rendered by Argo CD via `helm template` — Helm's own
+  install/upgrade hook lifecycle never runs, so ordering (e.g. migrations
+  before rollout) is driven by Argo CD's own hook annotations instead of
+  `helm.sh/hook`. See ../../gitops-plan.md for the full design.
+type: application
+version: 0.1.0
+# appVersion is informational only here — the real per-service versions are
+# the backend/frontend image tags set in values-<env>.yaml, bumped by CI.
+appVersion: "0.1.0"

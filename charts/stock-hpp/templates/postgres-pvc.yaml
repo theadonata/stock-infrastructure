@@ -1,0 +1,16 @@
+# Standalone PVC (not a StatefulSet volumeClaimTemplate) so it survives
+# independently of the StatefulSet's lifecycle and its size is visible/
+# editable in one place alongside the rest of this chart's storage config.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-postgres-data
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.postgres.storage.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage.size }}

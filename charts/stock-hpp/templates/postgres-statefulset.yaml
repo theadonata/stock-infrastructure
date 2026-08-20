@@ -1,0 +1,68 @@
+# Single-replica in-cluster Postgres using stock-backend/db/Dockerfile's own
+# image (custom initdb scripts) — not a third-party chart/subchart, per
+# gitops-plan.md's tool-selection rationale. StatefulSet (not Deployment) so
+# the pod keeps a stable network identity even though there's only one
+# replica; scaling Postgres itself is explicitly out of scope (see
+# infrastructure.md's scalability assessment — this is the real ceiling).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-postgres
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "stock-hpp.fullname" . }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "stock-hpp.selectorLabels" (dict "component" "postgres" "Chart" .Chart) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stock-hpp.selectorLabels" (dict "component" "postgres" "Chart" .Chart) | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgres.port }}
+          # Same creds the SealedSecret's DATABASE_URL is built from — kept
+          # in the same Secret so they can't drift out of sync with each
+          # other. See ../../secrets/<env>/backend-secrets.sealed.yaml.
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "stock-hpp.fullname" . }}-postgres-data

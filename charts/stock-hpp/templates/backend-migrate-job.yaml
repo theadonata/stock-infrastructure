@@ -1,0 +1,44 @@
+# One-shot migration Job — Fix A from gitops-plan.md. Argo CD only ever runs
+# `helm template` on this chart (it does not `helm install`/`upgrade`), so
+# Helm's own hook lifecycle (helm.sh/hook) never fires. Ordering here is
+# driven entirely by Argo CD's own hook annotations instead: PreSync means
+# Argo CD applies and waits for this Job to reach Complete *before* syncing
+# the backend Deployment, removing the race that would exist if migrations
+# ran at pod startup under multiple replicas.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-backend-migrate
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    # Each sync gets a fresh Job — a Job with the previous sync's name still
+    # `Complete` would otherwise be immutable and fail to reapply.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "stock-hpp.selectorLabels" (dict "component" "backend-migrate" "Chart" .Chart) | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: migrate
+          # Same image as the Deployment — only the command differs.
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "stock-hpp.fullname" . }}-backend-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: DATABASE_URL
