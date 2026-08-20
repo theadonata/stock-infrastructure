@@ -161,7 +161,7 @@ else
     # with "No resources found" or "connection refused" instead of
     # retrying. Poll for the node to actually show up first, then do the
     # real Ready wait.
-    for i in $(seq 1 60); do
+    for _ in $(seq 1 60); do
       if kubectl get nodes --no-headers 2>/dev/null | grep -q .; then
         break
       fi
