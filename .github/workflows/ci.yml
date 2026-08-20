@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets a Sonar-only config change (or a manual re-check) be re-run without
+  # needing a throwaway commit.
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write # for SARIF upload — no packages: write, this repo builds/pushes no image
+
+jobs:
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  terraform-fmt:
+    name: Terraform fmt check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      # Runs once, repo-wide, rather than duplicated per environment in the
+      # matrix job below — same check either way, one less noisy log.
+      - name: terraform fmt -check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+  terraform-validate:
+    name: Terraform validate (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # environments are independent; one failing shouldn't hide the others
+      matrix:
+        environment: [k3s, bootstrap, dev, staging]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      # -backend=false: every environment here uses local state (see
+      # terraform/README.md) and the real target is a homelab cluster CI
+      # can't reach, so there's no real backend/state for CI to initialize
+      # against — this only downloads provider plugins for `validate`.
+      # No -upgrade: must honor the committed .terraform.lock.hcl exactly,
+      # so a versions.tf bump without a matching lock-file update fails
+      # loudly here instead of drifting silently.
+      - name: terraform init (no backend)
+        working-directory: terraform/environments/${{ matrix.environment }}
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        working-directory: terraform/environments/${{ matrix.environment }}
+        run: terraform validate
+
+  helm:
+    name: Helm lint & template (${{ matrix.overlay }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        overlay: [dev, staging]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned explicitly (not the action's default) — the chart's `apiVersion: v2`
+      # and the hashicorp/helm provider both require Helm v3; a future default
+      # bump to v4 would silently break that assumption.
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.21.4
+
+      - name: helm lint
+        run: helm lint charts/stock-hpp -f charts/stock-hpp/values.yaml -f charts/stock-hpp/values-${{ matrix.overlay }}.yaml
+
+      - name: helm template
+        run: helm template charts/stock-hpp -f charts/stock-hpp/values.yaml -f charts/stock-hpp/values-${{ matrix.overlay }}.yaml
+
+  shellcheck:
+    name: Shellcheck (scripts/)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: "./scripts"
+          severity: warning # stricter than the action's `error` default — these scripts
+          # mutate a live cluster and generate-secrets.sh handles secret material
+
+  dependency-review:
+    name: Dependency scanning
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
+  iac-scan:
+    name: IaC misconfiguration scan (Trivy, ${{ matrix.scope.category }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Two scoped scans (not one combined scan-ref: .) so unrelated stray
+        # files aren't swept in, and each shows up separately in the Security tab.
+        scope:
+          - { path: terraform, category: terraform }
+          - { path: charts, category: helm-chart }
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run Trivy config scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: ${{ matrix.scope.path }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: "HIGH,CRITICAL"
+
+      - name: Upload results to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: ${{ matrix.scope.category }}
+
+  sonarcloud:
+    name: SonarCloud analysis
+    runs-on: ubuntu-latest
+    # Gates on all three lint/validate jobs collectively — there's no single
+    # "test" job here the way the sibling app repos have.
+    needs: [terraform-validate, helm, shellcheck]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
