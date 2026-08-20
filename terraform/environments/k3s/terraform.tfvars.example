@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (gitignored) if you need to override the
+# defaults — the defaults are usually fine as-is.
+# k3s_version     = "v1.36.3+k3s1"
+# kubeconfig_path = "~/.kube/config"
