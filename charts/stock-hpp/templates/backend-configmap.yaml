@@ -7,6 +7,14 @@ metadata:
   name: {{ include "stock-hpp.fullname" . }}-backend-config
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
+  annotations:
+    # The migrate Job (backend-migrate-job.yaml) is a PreSync hook and
+    # envFrom's this ConfigMap. Without this, the ConfigMap is a normal
+    # Sync-phase resource that doesn't exist yet when the PreSync Job's pod
+    # starts, so its container fails with CreateContainerConfigError. Making
+    # this a PreSync hook too (one wave earlier) guarantees it exists first.
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-1"
 data:
   JWT_ALGORITHM: {{ .Values.backend.env.JWT_ALGORITHM | quote }}
   ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.backend.env.ACCESS_TOKEN_EXPIRE_MINUTES | quote }}
