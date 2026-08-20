@@ -3,7 +3,8 @@
 Holds `backend-secrets.sealed.yaml` — a `SealedSecret` CR, safe to commit
 because its contents are ciphertext only the in-cluster Sealed Secrets
 controller can decrypt. Not managed by Terraform or templated by the Helm
-chart (see `../../gitops-plan.md`'s tool-selection table for why); this
+chart (see `../../docs/adr/0002-gitops-deployment-architecture.md`'s
+tool-selection section for why); this
 directory is applied by Argo CD as the second source in `dev`'s multi-source
 Application (see `../../terraform/modules/argocd-application`).
 

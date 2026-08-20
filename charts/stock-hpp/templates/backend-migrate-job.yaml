@@ -1,4 +1,5 @@
-# One-shot migration Job — Fix A from gitops-plan.md. Argo CD only ever runs
+# One-shot migration Job — Fix A from
+# docs/adr/0002-gitops-deployment-architecture.md. Argo CD only ever runs
 # `helm template` on this chart (it does not `helm install`/`upgrade`), so
 # Helm's own hook lifecycle (helm.sh/hook) never fires. Ordering here is
 # driven entirely by Argo CD's own hook annotations instead: PreSync means

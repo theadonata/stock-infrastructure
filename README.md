@@ -20,7 +20,8 @@ The platform choice is made and built: **k3s** (k8s distro) + **Argo CD**
 (GitOps controller) + **Helm** (chart packaging) + **Terraform**
 (provisions k3s itself, Argo CD, Sealed Secrets, and the per-environment
 Argo CD Applications) + **Sealed Secrets** (encrypted secrets in git). See
-`gitops-plan.md` for the full design and why these were chosen.
+`docs/adr/0002-gitops-deployment-architecture.md` for the full design and
+why these were chosen.
 
 Built and working: the Helm chart (`charts/stock-hpp/`), the full Terraform
 layer (`terraform/`), and a step-by-step runbook (`runbook.md`) with a
@@ -28,11 +29,12 @@ wrapper script (`scripts/bootstrap-cluster.sh`) to drive it. Both `dev` and
 `staging` environments are wired up (dev auto-syncs, staging requires a
 manual sync — see `runbook.md` §1–3).
 
-**Known gap:** image promotion (bumping the deployed image tag after a
-`stock-backend`/`stock-frontend` merge) is still a manual pull request —
-the CI jobs that would automate this (`bump-dev`/`bump-staging`) don't
-exist yet in those repos' `.github/workflows/ci.yml`. See `runbook.md`'s
-top-of-file note and §2.
+**Known gap:** the `bump-dev`/`bump-staging` CI jobs that automate image
+promotion now exist in `stock-backend`'s/`stock-frontend`'s
+`.github/workflows/ci.yml`, but depend on one-time GitHub account/repo
+setup (a PAT, a secret, two settings toggles) that hasn't been done yet —
+see `runbook.md` §0 "Enabling automatic image promotion". Until then, image
+promotion falls back to the manual PR flow documented in `runbook.md` §2.
 
 `stock-backend` and `stock-frontend` each still own their own `Dockerfile`
 and `docker-compose.yml` for local development, independent of this repo —
@@ -44,16 +46,17 @@ See `stock-business-analyst/docs/superpowers/specs/2026-08-12-stack-architecture
 for the full stack/architecture design, including the intended
 infrastructure approach.
 
-See `infrastructure.md` (this repo) for the original Kubernetes
-deployability and scalability assessment — what was already k8s-ready, and
-the concrete blockers it flagged (migration execution, missing readiness
-probe, frontend's build-time backend URL). Two of those are now addressed
-architecturally by the Helm chart (`gitops-plan.md`'s Fix A: a PreSync
-migration Job; Fix B: runtime-injected frontend config) but still need the
-corresponding code changes landed in `stock-backend`/`stock-frontend`
-themselves before they're actually fixed end to end. The open decisions
-`infrastructure.md` flagged (k8s distribution, Postgres hosting) are
-resolved in `gitops-plan.md` (k3s; in-cluster Postgres StatefulSet).
+See `docs/adr/0002-gitops-deployment-architecture.md` for the full
+architecture decision record — it supersedes the original Kubernetes
+deployability/scalability assessment and design plan (both since deleted;
+their decisions are distilled into that ADR). Covers what was already
+k8s-ready, the concrete blockers that were flagged (migration execution,
+missing readiness probe, frontend's build-time backend URL — the first two
+are now addressed architecturally by the Helm chart's Fix A/B, though Fix
+B still needs the corresponding code change landed in `stock-frontend`
+itself before it's fixed end to end), and how the open platform decisions
+(k8s distribution, Postgres hosting) were resolved (k3s; in-cluster
+Postgres StatefulSet).
 
 ## Operating this repo
 
@@ -74,7 +77,9 @@ resolved in `gitops-plan.md` (k3s; in-cluster Postgres StatefulSet).
   `secrets/<env>/backend-secrets.sealed.yaml` from real values in
   `.env.local`, run automatically by `bootstrap-cluster.sh` for whichever
   environment doesn't already have one.
-- `gitops-plan.md` — the design: tool choices, repo layout, phased rollout.
+- `docs/adr/` — architecture decision records: tool choices and why
+  (`0002-gitops-deployment-architecture.md`), the cross-repo bump
+  credential (`0001-cross-repo-bump-credential.md`).
 - `terraform/` — Terraform modules/environments that provision k3s itself,
   Argo CD, Sealed Secrets, namespaces, and the per-environment Argo CD
   Applications.

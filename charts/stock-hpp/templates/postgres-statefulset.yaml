@@ -1,9 +1,9 @@
 # Single-replica in-cluster Postgres using stock-backend/db/Dockerfile's own
 # image (custom initdb scripts) — not a third-party chart/subchart, per
-# gitops-plan.md's tool-selection rationale. StatefulSet (not Deployment) so
-# the pod keeps a stable network identity even though there's only one
-# replica; scaling Postgres itself is explicitly out of scope (see
-# infrastructure.md's scalability assessment — this is the real ceiling).
+# docs/adr/0002-gitops-deployment-architecture.md's tool-selection
+# rationale. StatefulSet (not Deployment) so the pod keeps a stable network
+# identity even though there's only one replica; scaling Postgres itself is
+# explicitly out of scope (see that same ADR — this is the real ceiling).
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

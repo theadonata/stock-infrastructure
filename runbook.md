@@ -10,13 +10,17 @@ If you get stuck at any point, jump to **§7 Troubleshooting** near the
 bottom — it lists the most common things that go wrong and how to check
 what's happening.
 
-**Current gap to know about up front:** the CI jobs that would auto-bump
-`values-dev.yaml`/`values-staging.yaml` (`bump-dev`/`bump-staging`, per
-`gitops-plan.md` Phase 1/2) don't exist yet in `stock-backend`'s/
-`stock-frontend`'s `.github/workflows/ci.yml`. Until they're built, image
-promotion (§2 below) is a manual pull request instead of fully automatic.
-Everything else in this runbook — bootstrap, Argo CD syncing, rollback,
-secret rotation — works today regardless.
+**One-time GitHub setup needed for automatic image promotion:** the
+`bump-dev`/`bump-staging` CI jobs (per
+`docs/adr/0002-gitops-deployment-architecture.md`) exist in
+`stock-backend`'s/`stock-frontend`'s `.github/workflows/ci.yml`, but they
+depend on account/repo settings a script can't set up for you — a PAT,
+a secret, and a couple of GitHub UI toggles. See §0 "Enabling automatic
+image promotion" below. Until that's done once, those jobs will fail rather
+than silently doing nothing — image promotion (§2/§3) falls back to the
+manual PR flow documented there in the meantime. Everything else in this
+runbook — bootstrap, Argo CD syncing, rollback, secret rotation — works
+today regardless.
 
 ---
 
@@ -153,6 +157,30 @@ proposing a change and reviewing it before it takes effect, rather than
 editing the live version directly. You'll need push access to
 `stock-infrastructure` on GitHub, and per this repo's `CLAUDE.md`, changes
 never go directly to the `main` branch — always a new branch + PR.
+
+**Enabling automatic image promotion (one-time).** `stock-backend`'s and
+`stock-frontend`'s CI bump the image tag(s) in `values-dev.yaml`/
+`values-staging.yaml` and open a PR here automatically after every merge to
+their `main` — dev's PR auto-merges immediately, staging's waits for you to
+review it (see §2/§3). This needs three things set up once, none of which a
+file in this repo can do for you — they're GitHub account/repo settings:
+
+1. **Mint a fine-grained PAT** at
+   `github.com/settings/personal-access-tokens/new` — Resource owner: your
+   account, Repository access: only `stock-infrastructure`, Permissions:
+   Contents (Read and write), Pull requests (Read and write). Don't reuse a
+   PAT used for anything else (see `docs/adr/0001-cross-repo-bump-credential.md`
+   for why) — mint a fresh one for exactly this.
+2. **Add it as a secret** named `INFRA_REPO_PAT` in both `stock-backend`'s
+   and `stock-frontend`'s repo settings (Settings → Secrets and variables →
+   Actions → New repository secret) — same value, both repos.
+3. **In `stock-infrastructure`'s own repo settings:** turn on "Allow
+   auto-merge" (Settings → General → Pull Requests), and add this repo's
+   CI job names — `secret-scan`, `terraform-fmt`, `terraform-validate`,
+   `helm`, `shellcheck`, `dependency-review`, `iac-scan`, `sonarcloud` — to
+   `main`'s required-status-checks list (Settings → Branches → Branch
+   protection rules). Without required checks, a bump PR has nothing to
+   gate its auto-merge on.
 
 ---
 
@@ -334,51 +362,63 @@ do next — read them as you need them.
 
 ## 2. Deploying a change
 
-*(Currently a manual process — see the "current gap" note at the top of
-this doc for why.)*
+Once §0's one-time GitHub setup is done, this is fully automatic:
 
 1. Merge the change in `stock-backend` or `stock-frontend`. Its CI builds,
-   tests, and pushes the new container image to `ghcr.io` (this part
-   already works, no action needed here).
-2. In `stock-infrastructure`, branch off `main` (sync first — see
-   `CLAUDE.md`), then update the image tag in
-   `charts/stock-hpp/values-dev.yaml` to point at the new image:
-   ```bash
-   git fetch origin && git merge --ff-only origin/main
-   git checkout -b bump-dev-<short-sha>
-   yq eval -i '.backend.image.tag = "<sha>"' charts/stock-hpp/values-dev.yaml
-   # (use .frontend.image.tag instead if it was the frontend that changed)
-   git add charts/stock-hpp/values-dev.yaml
-   git commit -m "bump dev backend image to <sha>"
-   git push -u origin bump-dev-<short-sha>
-   gh pr create --fill
-   ```
-3. Merge the pull request.
-4. Argo CD notices the change to `values-dev.yaml` and updates the cluster
+   tests, and pushes the new image(s) to `ghcr.io`, then bumps the tag(s)
+   in `charts/stock-hpp/values-dev.yaml` here and opens a PR
+   (`bump-dev-backend`/`bump-dev-frontend`) — no action needed from you.
+2. That PR auto-merges itself once this repo's required checks pass
+   (usually within a minute or two).
+3. Argo CD notices the change to `values-dev.yaml` and updates the cluster
    to match — running the database migration first, then rolling out the
    new version. You can force it to check immediately instead of waiting:
    ```bash
    kubectl patch application stock-hpp-dev -n argocd --type merge -p '{"operation":{"sync":{}}}'
    ```
-5. Watch it happen:
+4. Watch it happen:
    ```bash
    kubectl get application stock-hpp-dev -n argocd -w
    kubectl get jobs -n stock-hpp-dev
    kubectl get pods -n stock-hpp-dev -o wide
    ```
 
+**Manual fallback** — if the bump job isn't set up yet (§0) or is
+temporarily broken, do its job by hand:
+```bash
+git fetch origin && git merge --ff-only origin/main
+git checkout -b bump-dev-<short-sha>
+yq eval -i '.backend.image.tag = "<sha>"' charts/stock-hpp/values-dev.yaml
+# if it was the backend that changed, also bump the db image tag alongside
+# it — same commit, same image repo, they move together:
+yq eval -i '.postgres.image.tag = "<sha>"' charts/stock-hpp/values-dev.yaml
+# (use .frontend.image.tag instead if it was the frontend that changed —
+# frontend has no matching second field)
+git add charts/stock-hpp/values-dev.yaml
+git commit -m "bump dev backend image to <sha>"
+git push -u origin bump-dev-<short-sha>
+gh pr create --fill
+```
+
 ---
 
 ## 3. Promoting dev → staging
 
 Staging is meant to be a deliberate, reviewed step — not something that
-happens automatically the moment dev looks good.
+happens automatically the moment dev looks good. Two separate gates
+protect that:
 
-1. Same bump procedure as §2, but on `values-staging.yaml`. This pull
-   request should get an actual review before merging — that review *is*
-   the promotion gate.
-2. After merging, staging still does **not** deploy on its own. Trigger it
-   by hand once you're satisfied:
+1. Every merge to `stock-backend`'s/`stock-frontend`'s `main` also opens a
+   bump PR against `values-staging.yaml` here (`bump-staging-backend`/
+   `bump-staging-frontend`), same as dev — but it does **not** auto-merge.
+   Reviewing and merging that PR, whenever you decide dev looks good enough
+   to promote, *is* the first gate. Each new push updates the same open PR
+   in place rather than piling up a new one, so there's always at most one
+   pending staging bump per app to look at. If the bump job isn't set up
+   yet (§0), do the same edit by hand — see §2's manual fallback, targeting
+   `values-staging.yaml` instead.
+2. After merging, staging still does **not** deploy on its own — that's the
+   second gate. Trigger it by hand once you're satisfied:
    ```bash
    kubectl patch application stock-hpp-staging -n argocd --type merge \
      -p '{"operation":{"sync":{}}}'
@@ -475,8 +515,8 @@ How many copies ("replicas") of the backend/frontend run is set in
 it for one environment only, add the override to that environment's
 `values-<env>.yaml` file rather than editing the shared default, then PR
 it as usual. The database is intentionally always a single copy — see
-`infrastructure.md` for why that's a real limit of this setup, not
-something you can fix by just bumping a number.
+`docs/adr/0002-gitops-deployment-architecture.md` for why that's a real
+limit of this setup, not something you can fix by just bumping a number.
 
 ---
 

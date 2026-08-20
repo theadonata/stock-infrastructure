@@ -1,0 +1,127 @@
+name: Bump chart values
+
+# Reusable workflow called from stock-backend's and stock-frontend's own
+# ci.yml after they build+push a new image, to bump the image tag(s) in
+# this repo's charts/stock-hpp/values-<env>.yaml and open a PR. Lives here
+# (not duplicated in each app repo) since the logic is identical apart from
+# which fields to set — see CONTEXT.md's "Bump job"/"Bump PR" entries.
+#
+# One-time setup this depends on (not expressible as code — see runbook.md
+# §0 "Enabling automatic image promotion"):
+#   - INFRA_REPO_PAT secret in stock-backend and stock-frontend
+#   - "Allow auto-merge" enabled in this repo's settings
+#   - This repo's CI jobs added to main's required-status-checks
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target environment: dev or staging"
+        required: true
+        type: string
+      app_label:
+        description: "Short app name for branch/PR naming, e.g. backend or frontend"
+        required: true
+        type: string
+      image_tag:
+        description: "Image tag to bump to — the triggering commit's SHA"
+        required: true
+        type: string
+      yq_paths:
+        description: "Space-separated yq paths to set to image_tag, e.g. '.backend.image.tag .postgres.image.tag'"
+        required: true
+        type: string
+      auto_merge:
+        description: "Enable auto-merge on the bump PR once required checks pass (dev only — staging waits for a human)"
+        required: true
+        type: boolean
+    secrets:
+      infra_repo_pat:
+        description: "Fine-grained PAT scoped to stock-infrastructure (Contents R/W, Pull requests R/W) — see docs/adr/0001-cross-repo-bump-credential.md"
+        required: true
+
+jobs:
+  bump:
+    name: Bump ${{ inputs.app_label }} image tag (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    # One branch per {environment, app}, reused across runs (see below) —
+    # this stops concurrent pushes from racing on the same branch/PR.
+    concurrency:
+      group: bump-${{ inputs.environment }}-${{ inputs.app_label }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout stock-infrastructure
+        uses: actions/checkout@v7
+        with:
+          repository: theadonata/stock-infrastructure
+          token: ${{ secrets.infra_repo_pat }}
+
+      - name: Compute branch/commit naming
+        id: meta
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          APP_LABEL: ${{ inputs.app_label }}
+        run: |
+          # Stable name, not per-sha: staging bump PRs can sit open for a
+          # while awaiting human review, so each new push should update the
+          # same PR rather than pile up a new one next to it. Dev merges
+          # itself quickly, but reuses the same scheme for consistency.
+          echo "branch=bump-${ENVIRONMENT}-${APP_LABEL}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${IMAGE_TAG:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Bump image tag(s) in values file
+        env:
+          YQ_PATHS: ${{ inputs.yq_paths }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          for path in $YQ_PATHS; do
+            yq eval -i "${path} = \"${IMAGE_TAG}\"" "charts/stock-hpp/values-${ENVIRONMENT}.yaml"
+          done
+
+      - name: Commit and push bump branch
+        env:
+          GH_TOKEN: ${{ secrets.infra_repo_pat }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          APP_LABEL: ${{ inputs.app_label }}
+          BRANCH: ${{ steps.meta.outputs.branch }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+        run: |
+          git config user.name "stock-hpp-bump-bot"
+          git config user.email "actions@github.com"
+          git checkout -B "$BRANCH"
+          git add "charts/stock-hpp/values-${ENVIRONMENT}.yaml"
+          git commit -m "bump ${ENVIRONMENT} ${APP_LABEL} image to ${SHORT_SHA}"
+          # Fresh checkout every run means this branch always starts from
+          # main's current tip, so force-with-lease is just "replace my own
+          # last bump attempt", not a real overwrite risk.
+          git push --force-with-lease -u origin "$BRANCH"
+
+      - name: Open PR (or reuse the existing open one for this branch)
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.infra_repo_pat }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          APP_LABEL: ${{ inputs.app_label }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          BRANCH: ${{ steps.meta.outputs.branch }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+        run: |
+          existing=$(gh pr list --repo theadonata/stock-infrastructure \
+            --head "$BRANCH" --state open --json url -q '.[0].url')
+          if [ -n "$existing" ]; then
+            echo "url=$existing" >> "$GITHUB_OUTPUT"
+          else
+            url=$(gh pr create --repo theadonata/stock-infrastructure \
+              --title "bump ${ENVIRONMENT} ${APP_LABEL} image to ${SHORT_SHA}" \
+              --body "Automated image bump. Environment: ${ENVIRONMENT}. App: ${APP_LABEL}. Tag: ${IMAGE_TAG}." \
+              --base main --head "$BRANCH")
+            echo "url=$url" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable auto-merge
+        if: ${{ inputs.auto_merge }}
+        env:
+          GH_TOKEN: ${{ secrets.infra_repo_pat }}
+        run: gh pr merge --auto --squash "${{ steps.pr.outputs.url }}"

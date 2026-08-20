@@ -1,7 +1,7 @@
 # Staging overrides only. Image tags here are bumped by CI's bump-staging
 # job, same as dev, but the resulting PR is NOT auto-merged — a human
 # promotes staging by hand, and staging-app's Argo CD sync is manual too
-# (see gitops-plan.md Phase 2 and terraform/environments/staging).
+# (see docs/adr/0002-gitops-deployment-architecture.md and terraform/environments/staging).
 
 backend:
   image:
