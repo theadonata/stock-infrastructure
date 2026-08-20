@@ -1,0 +1,10 @@
+title = "gitleaks config for stock-infrastructure"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "SealedSecret ciphertext — asymmetrically encrypted, decryptable only by the in-cluster Sealed Secrets controller (see secrets/*/README.md). The default generic-api-key rule flags these purely on key name (JWT_SECRET, POSTGRES_PASSWORD, ...) plus entropy, with no way to tell it's ciphertext, not plaintext."
+paths = [
+  '''secrets/.*\.sealed\.yaml$''',
+]
