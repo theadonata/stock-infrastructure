@@ -1,6 +1,6 @@
 # Terraform layout
 
-Applies `../gitops-plan.md`'s design with Terraform managing everything from
+Applies `../docs/adr/0002-gitops-deployment-architecture.md`'s design with Terraform managing everything from
 k3s itself down through the cluster internals (Argo CD, Sealed Secrets,
 namespaces, Argo CD Applications).
 
@@ -94,7 +94,7 @@ either `../scripts/generate-secrets.sh {dev,staging}` (reads real values
 from `../.env.local`) or by hand per `../secrets/dev/README.md` — and
 commit them. Terraform does not create these itself; they're opaque,
 environment-specific ciphertext with nothing to template (see
-`../gitops-plan.md`'s tool-selection table).
+`../docs/adr/0002-gitops-deployment-architecture.md`'s tool-selection section).
 
 Also sanity-check the chart independently of Argo CD before relying on it:
 
@@ -131,11 +131,12 @@ terraform apply
 Same shape, but `automated_sync = false` — staging requires an explicit
 `Sync` (Argo CD UI or `argocd app sync stock-hpp-staging`) after each
 promotion PR is merged by hand. This is the deliberate environment-promotion
-gate described in `../gitops-plan.md` Phase 2, on top of the PR-merge gate.
+gate described in `../docs/adr/0002-gitops-deployment-architecture.md`, on
+top of the PR-merge gate.
 
 ## Why Terraform here, and why split this way
 
-The original plan (`../gitops-plan.md`) had Phase 0 as a sequence of
+The original plan (now `../docs/adr/0002-gitops-deployment-architecture.md`) had Phase 0 as a sequence of
 `kubectl apply -f` commands and `argocd-apps/<env>-app.yaml` as hand-written
 manifests. This replaces both with Terraform so the whole bootstrap +
 Application-registration layer is declarative, diffable (`terraform plan`),

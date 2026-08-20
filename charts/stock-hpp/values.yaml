@@ -21,7 +21,8 @@ backend:
   probes:
     # /healthz is deliberately DB-free (stock-backend/app/main.py:30), so it's
     # safe as a liveness probe. It is NOT yet safe as a readiness probe — see
-    # the /readyz companion fix noted in gitops-plan.md. Until that lands,
+    # the /readyz companion fix noted in
+    # docs/adr/0002-gitops-deployment-architecture.md. Until that lands,
     # readiness also points at /healthz, which means "pod is up" gets treated
     # as "pod can serve DB-backed requests"; tighten this once /readyz exists.
     liveness:
@@ -52,7 +53,8 @@ frontend:
       cpu: 200m
       memory: 128Mi
   config:
-    # Runtime-injected backend URL (Fix B in gitops-plan.md). Requires
+    # Runtime-injected backend URL (Fix B in
+    # docs/adr/0002-gitops-deployment-architecture.md). Requires
     # stock-frontend's docker-entrypoint.sh + config.js.template + the
     # client.ts window.__APP_CONFIG__ read to have landed — until then this
     # value is rendered into the ConfigMap/env var but the image ignores it.
@@ -61,8 +63,8 @@ frontend:
 postgres:
   image:
     # Same custom-initdb image stock-backend/db/Dockerfile already builds and
-    # pushes — not a third-party chart/subchart, see gitops-plan.md's tool
-    # selection table for why.
+    # pushes — not a third-party chart/subchart, see
+    # docs/adr/0002-gitops-deployment-architecture.md's tool selection for why.
     repository: ghcr.io/theadonata/stock-backend-db
     tag: dev
     pullPolicy: IfNotPresent

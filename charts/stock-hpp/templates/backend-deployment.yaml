@@ -3,7 +3,8 @@
 # backend-migrate-job.yaml via Argo CD's PreSync hook, which completes before
 # this Deployment's rolling update starts. Running `alembic upgrade head` in
 # this pod's command (copying docker-compose.yml's dev command verbatim)
-# would race under replicaCount > 1. See gitops-plan.md Fix A.
+# would race under replicaCount > 1. See
+# docs/adr/0002-gitops-deployment-architecture.md Fix A.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

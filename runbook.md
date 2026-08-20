@@ -11,7 +11,8 @@ bottom — it lists the most common things that go wrong and how to check
 what's happening.
 
 **One-time GitHub setup needed for automatic image promotion:** the
-`bump-dev`/`bump-staging` CI jobs (per `gitops-plan.md` Phase 1/2) exist in
+`bump-dev`/`bump-staging` CI jobs (per
+`docs/adr/0002-gitops-deployment-architecture.md`) exist in
 `stock-backend`'s/`stock-frontend`'s `.github/workflows/ci.yml`, but they
 depend on account/repo settings a script can't set up for you — a PAT,
 a secret, and a couple of GitHub UI toggles. See §0 "Enabling automatic
@@ -514,8 +515,8 @@ How many copies ("replicas") of the backend/frontend run is set in
 it for one environment only, add the override to that environment's
 `values-<env>.yaml` file rather than editing the shared default, then PR
 it as usual. The database is intentionally always a single copy — see
-`infrastructure.md` for why that's a real limit of this setup, not
-something you can fix by just bumping a number.
+`docs/adr/0002-gitops-deployment-architecture.md` for why that's a real
+limit of this setup, not something you can fix by just bumping a number.
 
 ---
 

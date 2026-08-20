@@ -2,7 +2,7 @@
 
 `stock-backend`'s and `stock-frontend`'s CI need to open (and for dev,
 merge) pull requests against the separate `stock-infrastructure` repo to
-bump image tags — `gitops-plan.md` specified the bump-job pattern itself
+bump image tags — `0002-gitops-deployment-architecture.md` specified the bump-job pattern itself
 but never addressed how CI in one repo gets write access to another. We
 chose a fine-grained PAT, scoped only to `stock-infrastructure` with
 Contents: Read/Write and Pull requests: Read/Write, stored as a repo secret
