@@ -111,7 +111,7 @@ if [ "$PLAN_ONLY" != true ]; then
   # k3s's own destroy provisioner uninstalls the cluster, but nothing
   # automatically removes the now-stale kubeconfig pointing at it — same
   # cleanup documented by hand in runbook.md §1's rebuild note.
-  kubeconfig_path=$(printf '%s' "~/.kube/config" | sed "s|^~|$HOME|")
+  kubeconfig_path="$HOME/.kube/config"
   if [ -f "$kubeconfig_path" ]; then
     rm -f "$kubeconfig_path"
     banner "removed stale $kubeconfig_path"
