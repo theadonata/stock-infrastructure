@@ -1,0 +1,23 @@
+# Staging overrides only. Image tags here are bumped by CI's bump-staging
+# job, same as dev, but the resulting PR is NOT auto-merged — a human
+# promotes staging by hand, and staging-app's Argo CD sync is manual too
+# (see gitops-plan.md Phase 2 and terraform/environments/staging).
+
+backend:
+  image:
+    tag: staging
+  env:
+    CORS_ORIGINS: "http://stock-hpp.staging.lan"
+
+frontend:
+  image:
+    tag: staging
+  config:
+    apiBaseUrl: "http://stock-hpp.staging.lan/api/v1"
+
+postgres:
+  image:
+    tag: staging
+
+ingress:
+  host: stock-hpp.staging.lan

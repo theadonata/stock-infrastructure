@@ -1,0 +1,26 @@
+# Dev overrides only. Image tags here are bumped automatically by CI's
+# bump-dev job (yq eval -i on this file) after every merge to main in
+# stock-backend/stock-frontend — see gitops-plan.md Phase 1.
+#
+# Placeholder hostnames below (`.dev.lan`) assume the k3s box resolves via
+# local DNS/hosts-file entries on the homelab network; swap for the real
+# hostname once one is chosen.
+
+backend:
+  image:
+    tag: dev
+  env:
+    CORS_ORIGINS: "http://stock-hpp.dev.lan"
+
+frontend:
+  image:
+    tag: dev
+  config:
+    apiBaseUrl: "http://stock-hpp.dev.lan/api/v1"
+
+postgres:
+  image:
+    tag: dev
+
+ingress:
+  host: stock-hpp.dev.lan

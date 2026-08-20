@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-backend
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "stock-hpp.selectorLabels" (dict "component" "backend" "Chart" .Chart) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.backend.port }}
+      targetPort: http

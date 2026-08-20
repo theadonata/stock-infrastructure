@@ -3,4 +3,17 @@
 .env.local
 .claude/settings.local.json
 
-# Repo-specific — none yet (no platform/tool chosen)
+# Repo-specific — Terraform (see terraform/)
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/terraform.tfvars
+!terraform/**/terraform.tfvars.example
+terraform/**/crash.log
+terraform/**/crash.*.log
+# .terraform.lock.hcl is intentionally NOT ignored — commit it so
+# `terraform init` resolves the same provider versions every time.
+
+# Sealed Secrets private key backup (runbook.md §1 step 3) — plaintext
+# key material, must never be committed even accidentally via `git add -A`.
+sealed-secrets-key-backup.yaml

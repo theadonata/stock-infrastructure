@@ -1,0 +1,89 @@
+# Shared defaults for every environment. values-dev.yaml / values-staging.yaml
+# only set what actually differs per environment (image tags, host, CORS
+# origin, runtime API base URL) — everything else (resources, probe paths,
+# ports, replica counts) lives here so the two env files stay short and the
+# diff between environments stays meaningful.
+
+backend:
+  image:
+    repository: ghcr.io/theadonata/stock-backend
+    tag: dev # overridden per environment; bumped by CI's bump-<env> job (yq eval -i)
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  probes:
+    # /healthz is deliberately DB-free (stock-backend/app/main.py:30), so it's
+    # safe as a liveness probe. It is NOT yet safe as a readiness probe — see
+    # the /readyz companion fix noted in gitops-plan.md. Until that lands,
+    # readiness also points at /healthz, which means "pod is up" gets treated
+    # as "pod can serve DB-backed requests"; tighten this once /readyz exists.
+    liveness:
+      path: /healthz
+    readiness:
+      path: /healthz
+  # Non-secret env vars, rendered into a ConfigMap. DATABASE_URL and
+  # JWT_SECRET are NOT here — they come from the SealedSecret in
+  # ../../secrets/<env>/, referenced by name via .Values.secretName.
+  env:
+    JWT_ALGORITHM: HS256
+    ACCESS_TOKEN_EXPIRE_MINUTES: "720"
+    PROJECT_NAME: "Stock/HPP Backend"
+    CORS_ORIGINS: "*" # overridden per environment to the real frontend origin
+
+frontend:
+  image:
+    repository: ghcr.io/theadonata/stock-frontend
+    tag: dev
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  config:
+    # Runtime-injected backend URL (Fix B in gitops-plan.md). Requires
+    # stock-frontend's docker-entrypoint.sh + config.js.template + the
+    # client.ts window.__APP_CONFIG__ read to have landed — until then this
+    # value is rendered into the ConfigMap/env var but the image ignores it.
+    apiBaseUrl: ""
+
+postgres:
+  image:
+    # Same custom-initdb image stock-backend/db/Dockerfile already builds and
+    # pushes — not a third-party chart/subchart, see gitops-plan.md's tool
+    # selection table for why.
+    repository: ghcr.io/theadonata/stock-backend-db
+    tag: dev
+    pullPolicy: IfNotPresent
+  port: 5432
+  storage:
+    size: 5Gi
+    storageClassName: local-path # k3s' built-in local-path-provisioner
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  className: traefik # k3s' built-in ingress controller
+  host: "" # set per environment in values-<env>.yaml
+
+# Name of the SealedSecret (decrypted to a plain Secret by the controller)
+# that supplies POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB, DATABASE_URL,
+# and JWT_SECRET. Created out-of-band via `kubeseal`, applied by Argo CD as
+# a second source alongside this chart — see ../../secrets/<env>/.
+secretName: stock-hpp-backend-secrets

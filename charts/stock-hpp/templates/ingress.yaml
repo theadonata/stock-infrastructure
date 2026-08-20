@@ -1,0 +1,29 @@
+# Host-based routing via Traefik (k3s' built-in ingress controller). `/api`
+# goes to the backend, everything else to the frontend SPA (which handles
+# its own client-side routing via nginx's try_files fallback).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stock-hpp.fullname" . }}-backend
+                port:
+                  number: {{ .Values.backend.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "stock-hpp.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.port }}

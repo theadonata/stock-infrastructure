@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stock-hpp.fullname" . }}-frontend
+  labels:
+    {{- include "stock-hpp.labels" . | nindent 4 }}
+    {{- include "stock-hpp.selectorLabels" (dict "component" "frontend" "Chart" .Chart) | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "stock-hpp.selectorLabels" (dict "component" "frontend" "Chart" .Chart) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stock-hpp.selectorLabels" (dict "component" "frontend" "Chart" .Chart) | nindent 8 }}
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.port }}
+          env:
+            # Consumed by the nginx entrypoint's envsubst step (Fix B) to
+            # generate /config.js at container start — same image promotes
+            # dev -> staging unchanged, only this env var differs.
+            - name: API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "stock-hpp.fullname" . }}-frontend-config
+                  key: API_BASE_URL
+          # nginx serves static files immediately; there's no DB/backend
+          # dependency to wait on, so liveness doubles as readiness here.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
