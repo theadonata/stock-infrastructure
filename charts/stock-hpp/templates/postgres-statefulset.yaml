@@ -52,9 +52,16 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secretName }}
                   key: POSTGRES_DB
+          # postgres:18+ (see stock-backend/db/Dockerfile) expects a single
+          # mount at /var/lib/postgresql, not /var/lib/postgresql/data — the
+          # image manages a major-version-specific subdirectory underneath
+          # itself for pg_ctlcluster-style upgrades. Mounting at .../data
+          # directly makes the image refuse to start with a "PostgreSQL data
+          # in an unused mount/volume" error. Confirmed live: CrashLoopBackOff
+          # on first real deploy.
           volumeMounts:
             - name: data
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
