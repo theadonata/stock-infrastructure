@@ -7,6 +7,15 @@ metadata:
   name: {{ include "stock-hpp.fullname" . }}-postgres-data
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
+  annotations:
+    # PreSync, same wave as postgres-service.yaml/postgres-statefulset.yaml:
+    # the migrate Job (PreSync, wave 0) needs a running, DNS-resolvable
+    # Postgres, which only exists once these are applied and the
+    # StatefulSet's pod is healthy. All three must sync together — the
+    # default StorageClass here binds WaitForFirstConsumer, so this PVC
+    # only actually binds once the StatefulSet's pod schedules against it.
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   accessModes:
     - ReadWriteOnce

@@ -10,6 +10,11 @@ metadata:
   name: {{ include "stock-hpp.fullname" . }}-postgres
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
+  annotations:
+    # PreSync, same wave as postgres-pvc.yaml/postgres-service.yaml —
+    # see postgres-pvc.yaml's comment for why.
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   serviceName: {{ include "stock-hpp.fullname" . }}-postgres
   replicas: 1
