@@ -91,4 +91,18 @@ kubectl create secret generic stock-hpp-backend-secrets \
     --controller-name=sealed-secrets --controller-namespace=sealed-secrets \
   > "$out_dir/backend-secrets.sealed.yaml"
 
+# Argo CD reads its PreSync hook/sync-wave from the SealedSecret resource's
+# own metadata (the object Argo CD actually applies and orders), not the
+# `spec.template.metadata` kubeseal writes for the Secret it unseals into
+# later -- kubeseal has no flag for the former, so set it as a
+# post-processing step here rather than by hand-editing the output file,
+# or the next run of this script silently drops it again. Both the
+# migrate Job and the Postgres StatefulSet (env: POSTGRES_USER/PASSWORD/DB)
+# read from the Secret this SealedSecret decrypts to, so it must exist
+# before either -- one wave earlier than postgres-*.yaml's "-1".
+yq eval -i '
+  .metadata.annotations."argocd.argoproj.io/hook" = "PreSync" |
+  .metadata.annotations."argocd.argoproj.io/sync-wave" = "-2"
+' "$out_dir/backend-secrets.sealed.yaml"
+
 echo "Wrote $out_dir/backend-secrets.sealed.yaml — safe to commit (ciphertext only)."
