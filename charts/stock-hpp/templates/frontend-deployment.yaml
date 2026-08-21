@@ -15,10 +15,51 @@ spec:
       labels:
         {{- include "stock-hpp.selectorLabels" (dict "component" "frontend" "Chart" .Chart) | nindent 8 }}
     spec:
+      # Matches nginx:alpine's built-in "nginx" user (uid/gid 101) — verified
+      # live against the running image, not assumed. fsGroup makes the
+      # emptyDirs below group-writable by that uid at mount time.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          # nginx normally starts as root (to bind :80, create
+          # /var/cache/nginx, then drop to the nginx user for workers) --
+          # running non-root from PID 1 instead needs NET_BIND_SERVICE to
+          # still bind the privileged port 80.
+          #
+          # Default pid path (/run/nginx.pid) is skipped in favor of /tmp:
+          # /run is where Kubernetes automounts the serviceaccount token
+          # (verified live: /run/secrets/... exists), and clobbering it with
+          # an emptyDir to make it nginx-writable would take that automount
+          # out along with it, for no reason this container needs.
+          command: ["nginx"]
+          args: ["-g", "daemon off; pid /tmp/nginx.pid;"]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
+          volumeMounts:
+            # nginx creates its own client/fastcgi/proxy/scgi/uwsgi temp
+            # dirs under here at startup — verified live they're nginx-owned,
+            # not baked into the image, so a plain emptyDir is enough.
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: tmp
+              mountPath: /tmp
+            # Single-file overlay: only this one path becomes writable
+            # (for docker/40-generate-config-js.sh's envsubst output),
+            # everything else under /usr/share/nginx/html stays the
+            # baked-in, read-only static build.
+            - name: frontend-config
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
           ports:
             - name: http
               containerPort: {{ .Values.frontend.port }}
@@ -47,3 +88,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: frontend-config
+          emptyDir: {}
