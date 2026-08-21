@@ -8,19 +8,16 @@
 
 backend:
   image:
-    tag: dev
+    tag: 06bf88780d88b8a1849e96f46dcfd83dd1180d83
   env:
     CORS_ORIGINS: "http://stock-hpp.dev.lan"
-
 frontend:
   image:
-    tag: dev
+    tag: b88d13506456a3ebc9e970a8d53525a7844b0f18
   config:
     apiBaseUrl: "http://stock-hpp.dev.lan/api/v1"
-
 postgres:
   image:
-    tag: dev
-
+    tag: 06bf88780d88b8a1849e96f46dcfd83dd1180d83
 ingress:
   host: stock-hpp.dev.lan
