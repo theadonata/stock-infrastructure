@@ -10,7 +10,7 @@ backend:
     CORS_ORIGINS: "http://stock-hpp.staging.lan"
 frontend:
   image:
-    tag: staging
+    tag: 611caac9f5137a4c88c6aca6c40d24df88f5ae03
   config:
     apiBaseUrl: "http://stock-hpp.staging.lan/api/v1"
 postgres:
