@@ -405,20 +405,18 @@ gh pr create --fill
 ## 3. Promoting dev → staging
 
 Staging is meant to be a deliberate, reviewed step — not something that
-happens automatically the moment dev looks good. Two separate gates
-protect that:
+happens automatically the moment dev looks good. One gate protects that:
 
 1. Every merge to `stock-backend`'s/`stock-frontend`'s `main` also opens a
    bump PR against `values-staging.yaml` here (`bump-staging-backend`/
-   `bump-staging-frontend`), same as dev — but it does **not** auto-merge.
-   Reviewing and merging that PR, whenever you decide dev looks good enough
-   to promote, *is* the first gate. Each new push updates the same open PR
-   in place rather than piling up a new one, so there's always at most one
-   pending staging bump per app to look at. If the bump job isn't set up
-   yet (§0), do the same edit by hand — see §2's manual fallback, targeting
-   `values-staging.yaml` instead.
-2. After merging, staging still does **not** deploy on its own — that's the
-   second gate. Trigger it by hand once you're satisfied:
+   `bump-staging-frontend`), same as dev, and it auto-merges the same way
+   too — so the git-level promotion to staging happens on its own. Each new
+   push updates the same open/merged branch in place rather than piling up
+   a new PR. If the bump job isn't set up yet (§0), do the same edit by
+   hand — see §2's manual fallback, targeting `values-staging.yaml` instead.
+2. Staging still does **not** deploy on its own, though — that's the actual
+   gate now. Argo CD won't roll it out until you trigger a sync by hand,
+   whenever you decide dev looks good enough to promote:
    ```bash
    kubectl patch application stock-hpp-staging -n argocd --type merge \
      -p '{"operation":{"sync":{}}}'

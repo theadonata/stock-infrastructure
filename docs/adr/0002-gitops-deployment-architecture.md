@@ -60,8 +60,8 @@ runners can't reach, so there's no shared state to plan against and nothing
 to apply to; applying stays a human running `scripts/bootstrap-cluster.sh`.
 
 **Image promotion**: a CI job that opens a PR against `stock-infrastructure`
-(auto-merged for dev, human-merged for staging), not Argo CD Image
-Updater's default direct-branch-commit mode — the latter cuts against every
+and auto-merges it for both dev and staging, not Argo CD Image Updater's
+default direct-branch-commit mode — the latter cuts against every
 repo's hard "never push directly to main, always PR" rule, while a small CI
 job reusing the existing branch→PR flow keeps it auditable and needs no
 second controller running alongside Argo CD. The cross-repo write
