@@ -8,13 +8,16 @@ metadata:
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
   annotations:
-    # PreSync, same wave as postgres-service.yaml/postgres-statefulset.yaml:
-    # the migrate Job (PreSync, wave 0) needs a running, DNS-resolvable
-    # Postgres, which only exists once these are applied and the
-    # StatefulSet's pod is healthy. All three must sync together — the
-    # default StorageClass here binds WaitForFirstConsumer, so this PVC
-    # only actually binds once the StatefulSet's pod schedules against it.
-    argocd.argoproj.io/hook: PreSync
+    # sync-wave (not a PreSync hook): same wave as postgres-service.yaml/
+    # postgres-statefulset.yaml, ahead of the migrate Job (wave 0), which
+    # needs a running, DNS-resolvable Postgres. Argo CD already waits for
+    # each wave to go healthy before advancing, so wave ordering alone gets
+    # us that — no hook needed. This PVC must NOT be a PreSync hook: Argo CD
+    # deletes and recreates hook-annotated resources on every sync
+    # (including automated self-heal syncs with no new commit), which was
+    # silently wiping the Postgres volume on every deploy. The default
+    # StorageClass here binds WaitForFirstConsumer, so this PVC only
+    # actually binds once the StatefulSet's pod schedules against it.
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   accessModes:
