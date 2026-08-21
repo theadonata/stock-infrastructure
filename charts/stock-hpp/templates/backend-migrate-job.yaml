@@ -33,7 +33,13 @@ spec:
           # Same image as the Deployment — only the command differs.
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
-          command: ["alembic", "upgrade", "head"]
+          # seed_admin is idempotent (skips if the user already exists), so
+          # chaining it after every migration is safe -- this is what makes
+          # a freshly-synced environment actually loggable-into, instead of
+          # requiring someone to run it by hand once per environment (see
+          # scripts/seed_admin.py's own docstring: "Run once after
+          # migrations" was always the intent, it just was never wired up).
+          command: ["sh", "-c", "alembic upgrade head && python -m scripts.seed_admin"]
           envFrom:
             - configMapRef:
                 name: {{ include "stock-hpp.fullname" . }}-backend-config

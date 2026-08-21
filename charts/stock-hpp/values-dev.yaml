@@ -10,12 +10,18 @@ backend:
   image:
     tag: 375c429902517d5dab0340d52332a61acb3b84de
   env:
-    CORS_ORIGINS: "http://stock-hpp.dev.lan"
+    CORS_ORIGINS: "http://stock-hpp.dev.lan,https://stock-hpp.dev.lan"
 frontend:
   image:
-    tag: b88d13506456a3ebc9e970a8d53525a7844b0f18
+    tag: 611caac9f5137a4c88c6aca6c40d24df88f5ae03
   config:
-    apiBaseUrl: "http://stock-hpp.dev.lan/api/v1"
+    # Protocol-relative (no scheme), and no /api/v1 -- client.ts appends its
+    # own "/api/v1" prefix, and browsers that auto-upgrade http:// page
+    # loads to https:// (Chrome's HTTPS-First Mode, HSTS, etc.) would
+    # otherwise block this as mixed content since it's a hardcoded http://
+    # call from an https:// page. "//host" lets the browser resolve the
+    # scheme from whatever the page itself was loaded with.
+    apiBaseUrl: "//stock-hpp.dev.lan"
 postgres:
   image:
     tag: 375c429902517d5dab0340d52332a61acb3b84de

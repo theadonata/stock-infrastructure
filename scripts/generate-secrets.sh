@@ -100,9 +100,21 @@ kubectl create secret generic stock-hpp-backend-secrets \
 # migrate Job and the Postgres StatefulSet (env: POSTGRES_USER/PASSWORD/DB)
 # read from the Secret this SealedSecret decrypts to, so it must exist
 # before either -- one wave earlier than postgres-*.yaml's "-1".
+#
+# Prune=false: this Application syncs from two sources (the Helm chart and
+# this raw secrets/<env> directory) with prune+selfHeal on. If the
+# directory source ever renders zero resources for one sync cycle (a
+# transient git/repo-server hiccup, a race during a burst of rapid
+# commits), Argo CD reads that as "this SealedSecret is no longer
+# desired" and deletes it -- taking the live Secret every backend pod
+# needs down with it. Reapplying this SealedSecret from git is always
+# safe (it's ciphertext, idempotent), so exempt it from pruning rather
+# than let one bad render wipe out a resource nothing else can survive
+# without.
 yq eval -i '
   .metadata.annotations."argocd.argoproj.io/hook" = "PreSync" |
-  .metadata.annotations."argocd.argoproj.io/sync-wave" = "-2"
+  .metadata.annotations."argocd.argoproj.io/sync-wave" = "-2" |
+  .metadata.annotations."argocd.argoproj.io/sync-options" = "Prune=false"
 ' "$out_dir/backend-secrets.sealed.yaml"
 
 echo "Wrote $out_dir/backend-secrets.sealed.yaml — safe to commit (ciphertext only)."
