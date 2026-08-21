@@ -27,8 +27,8 @@ multiple sources — the fix there was restoring a PreSync hook, not fixing
 the ordering. Keeping this stack in one source sidesteps that failure mode
 entirely rather than risking it again elsewhere. Its PVCs (Prometheus's
 TSDB, Loki's chunks, Grafana's dashboard DB) must never be marked as
-PreSync hooks, per the same day's `postgres-pvc.yaml`/
-`postgres-statefulset.yaml`/`postgres-service.yaml` fix — plain sync-wave
+PreSync hooks, per the same day's `charts/stock-hpp/templates/postgres/`
+fix (`pvc.yaml`/`statefulset.yaml`/`service.yaml`) — plain sync-wave
 is sufficient here since everything in this chart is single-source.
 
 Grafana dashboards are provisioned via ConfigMaps (committed to this repo),

@@ -78,7 +78,7 @@ promote there.
 **Fix A — migrations run as an Argo CD PreSync hook Job, not a pod-startup
 command.** The compose-only pattern (`alembic upgrade head && uvicorn ...`)
 would race under `replicas > 1` if copied verbatim into a Deployment. Fixed
-with `charts/stock-hpp/templates/backend-migrate-job.yaml`, a `Job`
+with `charts/stock-hpp/templates/backend/migrate-job.yaml`, a `Job`
 annotated `argocd.argoproj.io/hook: PreSync` (not `helm.sh/hook` — see the
 Helm/Argo CD note above) that Argo CD runs to completion before every
 sync's rollout.

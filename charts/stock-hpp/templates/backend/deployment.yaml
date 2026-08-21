@@ -1,6 +1,6 @@
 # Runs plain uvicorn only (stock-backend/Dockerfile's own CMD, line 61) —
 # migrations are NOT run here. They run once per release in
-# backend-migrate-job.yaml via Argo CD's PreSync hook, which completes before
+# migrate-job.yaml via Argo CD's PreSync hook, which completes before
 # this Deployment's rolling update starts. Running `alembic upgrade head` in
 # this pod's command (copying docker-compose.yml's dev command verbatim)
 # would race under replicaCount > 1. See
@@ -50,7 +50,7 @@ spec:
                 name: {{ include "stock-hpp.fullname" . }}-backend-config
           env:
             # Pulled from the SealedSecret decrypted by the Sealed Secrets
-            # controller — see ../../secrets/<env>/backend-secrets.sealed.yaml.
+            # controller — see secrets/<env>/backend-secrets.sealed.yaml.
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
