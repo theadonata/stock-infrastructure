@@ -30,6 +30,18 @@ spec:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          # uvicorn itself writes nothing to disk; /tmp is mounted defensively
+          # for python-multipart's SpooledTemporaryFile (used for uploads)
+          # and any incidental scratch use — cheap to provide, avoids a
+          # surprise crash the first time something needs it.
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           ports:
             - name: http
               containerPort: {{ .Values.backend.port }}
@@ -63,3 +75,6 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

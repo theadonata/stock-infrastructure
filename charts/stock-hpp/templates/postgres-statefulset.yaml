@@ -26,10 +26,22 @@ spec:
       labels:
         {{- include "stock-hpp.selectorLabels" (dict "component" "postgres" "Chart" .Chart) | nindent 8 }}
     spec:
+      # Matches the image's own USER postgres (uid/gid 70, see
+      # stock-backend/db/Dockerfile) — verified live, not assumed.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
       containers:
         - name: postgres
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
           imagePullPolicy: {{ .Values.postgres.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: postgres
               containerPort: {{ .Values.postgres.port }}
@@ -62,6 +74,14 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql
+            # unix_socket_directories (verified live: /var/run/postgresql,
+            # holding .s.PGSQL.5432 + its .lock file) isn't under the PVC
+            # mount above, so it needs its own writable path once the root
+            # fs is read-only.
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "$(POSTGRES_USER)", "-d", "$(POSTGRES_DB)"]
@@ -78,3 +98,7 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "stock-hpp.fullname" . }}-postgres-data
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

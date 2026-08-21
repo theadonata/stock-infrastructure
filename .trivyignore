@@ -1,0 +1,6 @@
+# charts/stock-hpp/templates/backend-configmap.yaml: KSV-0109 flags
+# ACCESS_TOKEN_EXPIRE_MINUTES as if it were a secret, purely because the key
+# name contains "TOKEN". It's a plain integer TTL (minutes), not a
+# credential — the actual secrets (DATABASE_URL, JWT_SECRET) are deliberately
+# kept out of this ConfigMap; see that file's own header comment.
+KSV-0109
