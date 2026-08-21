@@ -23,6 +23,29 @@ spec:
         runAsUser: 101
         runAsGroup: 101
         fsGroup: 101
+      # subPath-mounting a single emptyDir-backed file directly over an
+      # existing file in the image doesn't work reliably (confirmed live:
+      # "error mounting ... not a directory" — kubelet creates the subPath
+      # source as the wrong type for a brand-new emptyDir). Instead, copy
+      # the whole baked static build into a shared writable emptyDir before
+      # nginx starts, and mount that whole directory over
+      # /usr/share/nginx/html in the main container — the well-established
+      # pattern for a writable path inside an otherwise read-only image.
+      initContainers:
+        - name: copy-html
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          command: ["sh", "-c", "cp -r /usr/share/nginx/html/. /dest/"]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: html
+              mountPath: /dest
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
@@ -37,8 +60,13 @@ spec:
           # (verified live: /run/secrets/... exists), and clobbering it with
           # an emptyDir to make it nginx-writable would take that automount
           # out along with it, for no reason this container needs.
-          command: ["nginx"]
-          args: ["-g", "daemon off; pid /tmp/nginx.pid;"]
+          #
+          # `args` only, deliberately no `command`: k8s `command` replaces
+          # the image's Docker ENTRYPOINT, not just CMD — the image's
+          # ENTRYPOINT is /docker-entrypoint.sh, which is what actually runs
+          # docker/40-generate-config-js.sh before exec'ing nginx. Setting
+          # `command` here would have silently skipped that script entirely.
+          args: ["nginx", "-g", "daemon off; pid /tmp/nginx.pid;"]
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -53,13 +81,12 @@ spec:
               mountPath: /var/cache/nginx
             - name: tmp
               mountPath: /tmp
-            # Single-file overlay: only this one path becomes writable
-            # (for docker/40-generate-config-js.sh's envsubst output),
-            # everything else under /usr/share/nginx/html stays the
-            # baked-in, read-only static build.
-            - name: frontend-config
-              mountPath: /usr/share/nginx/html/config.js
-              subPath: config.js
+            # Populated by the copy-html initContainer above — writable, so
+            # docker/40-generate-config-js.sh's envsubst step (which runs in
+            # this container, before nginx starts) can still generate
+            # config.js here same as it always has.
+            - name: html
+              mountPath: /usr/share/nginx/html
           ports:
             - name: http
               containerPort: {{ .Values.frontend.port }}
@@ -93,5 +120,5 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
-        - name: frontend-config
+        - name: html
           emptyDir: {}
