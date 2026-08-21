@@ -11,16 +11,13 @@ backend:
     tag: dev
   env:
     CORS_ORIGINS: "http://stock-hpp.dev.lan"
-
 frontend:
   image:
-    tag: dev
+    tag: b88d13506456a3ebc9e970a8d53525a7844b0f18
   config:
     apiBaseUrl: "http://stock-hpp.dev.lan/api/v1"
-
 postgres:
   image:
     tag: dev
-
 ingress:
   host: stock-hpp.dev.lan
