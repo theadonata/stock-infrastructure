@@ -29,12 +29,13 @@ wrapper script (`scripts/bootstrap-cluster.sh`) to drive it. Both `dev` and
 `staging` environments are wired up (dev auto-syncs, staging requires a
 manual sync — see `runbook.md` §1–3).
 
-**Known gap:** the `bump-dev`/`bump-staging` CI jobs that automate image
-promotion now exist in `stock-backend`'s/`stock-frontend`'s
-`.github/workflows/ci.yml`, but depend on one-time GitHub account/repo
-setup (a PAT, a secret, two settings toggles) that hasn't been done yet —
-see `runbook.md` §0 "Enabling automatic image promotion". Until then, image
-promotion falls back to the manual PR flow documented in `runbook.md` §2.
+The `bump-dev`/`bump-staging` CI jobs that automate image promotion exist in
+`stock-backend`'s/`stock-frontend`'s `.github/workflows/ci.yml` and are set
+up and verified working end-to-end (both environments' bump PRs auto-merge;
+see `runbook.md` §0 "Enabling automatic image promotion" for the one-time
+GitHub account/repo setup this depends on, if reproducing this elsewhere).
+The manual PR flow in `runbook.md` §2 remains as a fallback if those jobs
+are ever broken or that setup hasn't been done.
 
 `stock-backend` and `stock-frontend` each still own their own `Dockerfile`
 and `docker-compose.yml` for local development, independent of this repo —

@@ -18,17 +18,17 @@ The pull request a bump job opens. Touches exactly one `values-<env>.yaml`'s
 image tag field(s), nothing else.
 
 **Promotion**:
-Moving a specific image from running in dev to running in staging, by merging
-staging's bump PR. Distinct from *sync* (below) — promotion decides *what*
-should run in staging; sync is Argo CD actually making it run.
+Moving a specific image from running in dev to running in staging. The bump
+PR auto-merges (same as dev), so this happens at the git level on its own;
+distinct from *sync* (below) — promotion decides *what* should run in
+staging, sync is Argo CD actually making it run.
 _Avoid_: deploy, release, ship.
 
 **Promotion gate**:
-Staging's deliberate two-step human checkpoint: a human merges the staging
-bump PR (the promotion decision), then a human triggers the Argo CD sync
-(`kubectl patch application stock-hpp-staging ...`) to apply it. Two separate
-gates, not one — merging the PR does not by itself deploy anything to
-staging.
+Staging's one remaining human checkpoint: a human triggers the Argo CD sync
+(`kubectl patch application stock-hpp-staging ...`) to actually roll out
+whatever the auto-merged bump PR last set. The bump PR merging does not by
+itself deploy anything to staging — only the sync does.
 
 **Sync**:
 Argo CD's term for reconciling the live cluster to match what git currently
