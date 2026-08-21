@@ -91,8 +91,8 @@ kubectl create secret generic stock-hpp-backend-secrets \
     --controller-name=sealed-secrets --controller-namespace=sealed-secrets \
   > "$out_dir/backend-secrets.sealed.yaml"
 
-# Argo CD reads its sync-wave from the SealedSecret resource's own metadata
-# (the object Argo CD actually applies and orders), not the
+# Argo CD reads its PreSync hook/sync-wave from the SealedSecret resource's
+# own metadata (the object Argo CD actually applies and orders), not the
 # `spec.template.metadata` kubeseal writes for the Secret it unseals into
 # later -- kubeseal has no flag for the former, so set it as a
 # post-processing step here rather than by hand-editing the output file,
@@ -101,24 +101,18 @@ kubectl create secret generic stock-hpp-backend-secrets \
 # read from the Secret this SealedSecret decrypts to, so it must exist
 # before either -- one wave earlier than postgres-*.yaml's "-1".
 #
-# Deliberately sync-wave only, NOT argocd.argoproj.io/hook: PreSync --
-# observed live that marking this hook-typed made Argo CD treat it as
-# ephemeral (excluded from tracked/managed resources) rather than a
-# persistent one, and it got deleted within milliseconds of every
-# selfHeal reconciliation, over and over, taking the whole backend down
-# each time. Plain sync-wave still orders it ahead of postgres-*.yaml
-# without that hook lifecycle.
-#
 # Prune=false: this Application syncs from two sources (the Helm chart and
 # this raw secrets/<env> directory) with prune+selfHeal on. If the
 # directory source ever renders zero resources for one sync cycle (a
 # transient git/repo-server hiccup, a race during a burst of rapid
-# commits), Argo CD could otherwise read that as "this SealedSecret is no
-# longer desired" and delete it. Reapplying this SealedSecret from git is
-# always safe (it's ciphertext, idempotent), so exempt it from pruning
-# rather than let one bad render wipe out a resource nothing else can
-# survive without.
+# commits), Argo CD reads that as "this SealedSecret is no longer
+# desired" and deletes it -- taking the live Secret every backend pod
+# needs down with it. Reapplying this SealedSecret from git is always
+# safe (it's ciphertext, idempotent), so exempt it from pruning rather
+# than let one bad render wipe out a resource nothing else can survive
+# without.
 yq eval -i '
+  .metadata.annotations."argocd.argoproj.io/hook" = "PreSync" |
   .metadata.annotations."argocd.argoproj.io/sync-wave" = "-2" |
   .metadata.annotations."argocd.argoproj.io/sync-options" = "Prune=false"
 ' "$out_dir/backend-secrets.sealed.yaml"
