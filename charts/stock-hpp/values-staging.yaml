@@ -5,7 +5,7 @@
 
 backend:
   image:
-    tag: 06bf88780d88b8a1849e96f46dcfd83dd1180d83
+    tag: 375c429902517d5dab0340d52332a61acb3b84de
   env:
     CORS_ORIGINS: "http://stock-hpp.staging.lan"
 frontend:
@@ -15,6 +15,6 @@ frontend:
     apiBaseUrl: "http://stock-hpp.staging.lan/api/v1"
 postgres:
   image:
-    tag: 06bf88780d88b8a1849e96f46dcfd83dd1180d83
+    tag: 375c429902517d5dab0340d52332a61acb3b84de
 ingress:
   host: stock-hpp.staging.lan
