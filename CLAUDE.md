@@ -45,9 +45,11 @@ review.
 
 ## Git
 
-Do not commit changes in this repo automatically — even when using
-atomic-commit or similar workflows. Only commit when the user explicitly
-asks for it.
+Commit, push, and open a PR automatically as part of completing a task —
+this is standing authorization across all five `stock-*` repos, no need to
+ask first each time. Use atomic-commit (or equivalent judgment) to split
+work into logical commits, then push the branch and open the PR without
+waiting for a separate go-ahead.
 
 Never push directly to the `main` branch, even when explicitly asked to
 "push" or "commit and push" — `main` is protected and requires a pull
