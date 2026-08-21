@@ -1,6 +1,10 @@
 # Non-secret backend env vars. DATABASE_URL and JWT_SECRET are deliberately
 # not here — they come from the SealedSecret referenced by .Values.secretName
 # (see backend-deployment.yaml's secretKeyRef and ../../secrets/<env>/).
+# Trivy (KSV-0109, suppressed via ../../.trivyignore) flags this ConfigMap
+# as holding secrets purely because "ACCESS_TOKEN_EXPIRE_MINUTES" contains
+# the word "TOKEN" — it's a plain integer TTL, not a credential. The real
+# secrets (DATABASE_URL, JWT_SECRET) are deliberately excluded, per above.
 apiVersion: v1
 kind: ConfigMap
 metadata:
