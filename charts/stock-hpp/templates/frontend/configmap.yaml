@@ -2,7 +2,7 @@
 # docs/adr/0002-gitops-deployment-architecture.md. Requires
 # stock-frontend's docker-entrypoint.sh (envsubst -> /config.js) and
 # client.ts's window.__APP_CONFIG__ read to have landed in that repo; this
-# ConfigMap is the infra-side half of that fix (see frontend-deployment.yaml
+# ConfigMap is the infra-side half of that fix (see deployment.yaml
 # for how it's wired into the container as an env var).
 apiVersion: v1
 kind: ConfigMap

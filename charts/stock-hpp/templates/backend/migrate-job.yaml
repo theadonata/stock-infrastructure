@@ -33,7 +33,7 @@ spec:
           # Same image as the Deployment — only the command differs.
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
-          # See backend-deployment.yaml's matching securityContext comment —
+          # See deployment.yaml's matching securityContext comment —
           # /tmp covers alembic/python-multipart's incidental scratch use.
           securityContext:
             readOnlyRootFilesystem: true

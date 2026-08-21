@@ -8,8 +8,8 @@ metadata:
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
   annotations:
-    # sync-wave (not a PreSync hook): same wave as postgres-service.yaml/
-    # postgres-statefulset.yaml, ahead of the migrate Job (wave 0), which
+    # sync-wave (not a PreSync hook): same wave as service.yaml/
+    # statefulset.yaml, ahead of the migrate Job (wave 0), which
     # needs a running, DNS-resolvable Postgres. Argo CD already waits for
     # each wave to go healthy before advancing, so wave ordering alone gets
     # us that — no hook needed. This PVC must NOT be a PreSync hook: Argo CD

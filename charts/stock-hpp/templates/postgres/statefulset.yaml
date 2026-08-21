@@ -11,8 +11,8 @@ metadata:
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
   annotations:
-    # sync-wave (not a PreSync hook), same wave as postgres-pvc.yaml/
-    # postgres-service.yaml — see postgres-pvc.yaml's comment for why this
+    # sync-wave (not a PreSync hook), same wave as pvc.yaml/
+    # service.yaml — see pvc.yaml's comment for why this
     # must not be a hook.
     argocd.argoproj.io/sync-wave: "-1"
 spec:
@@ -47,7 +47,7 @@ spec:
               containerPort: {{ .Values.postgres.port }}
           # Same creds the SealedSecret's DATABASE_URL is built from — kept
           # in the same Secret so they can't drift out of sync with each
-          # other. See ../../secrets/<env>/backend-secrets.sealed.yaml.
+          # other. See secrets/<env>/backend-secrets.sealed.yaml.
           env:
             - name: POSTGRES_USER
               valueFrom:
