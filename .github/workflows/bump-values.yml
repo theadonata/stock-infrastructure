@@ -94,9 +94,13 @@ jobs:
           git add "charts/stock-hpp/values-${ENVIRONMENT}.yaml"
           git commit -m "bump ${ENVIRONMENT} ${APP_LABEL} image to ${SHORT_SHA}"
           # Fresh checkout every run means this branch always starts from
-          # main's current tip, so force-with-lease is just "replace my own
-          # last bump attempt", not a real overwrite risk.
-          git push --force-with-lease -u origin "$BRANCH"
+          # main's current tip, so overwriting it is not a real overwrite
+          # risk -- it's always just "replace my own last bump attempt".
+          # Plain --force (not --force-with-lease): the checkout above never
+          # fetches this branch, so git has no local record of the remote
+          # ref to lease against and would reject the push as stale even
+          # though clobbering it here is exactly the intended behavior.
+          git push --force -u origin "$BRANCH"
 
       - name: Open PR (or reuse the existing open one for this branch)
         id: pr
