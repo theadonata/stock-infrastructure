@@ -45,3 +45,15 @@ the same `stock-backend` bump job in the same PR.
 _Avoid_: "the postgres image" unqualified — always distinguish it from a
 stock/third-party Postgres image when it matters (e.g. deciding what a bump
 job is responsible for).
+
+**Monitoring stack**:
+The shared Prometheus + Grafana + Loki + Alloy + Alertmanager deployment in
+the `monitoring` namespace (see `0003-observability-stack.md`), synced from
+one single-source Argo CD Application. One instance covers both
+`stock-hpp-dev` and `stock-hpp-staging` — it is not duplicated per
+environment the way the app itself is. Does not include tracing (Tempo is
+deferred until an app actually emits traces).
+_Avoid_: "observability stack" as a project-specific term — fine as a
+general description, but "monitoring stack"/"the monitoring namespace" is
+what this project actually calls it, matching the namespace/Application
+name.
