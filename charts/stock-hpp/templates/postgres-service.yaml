@@ -8,9 +8,9 @@ metadata:
   labels:
     {{- include "stock-hpp.labels" . | nindent 4 }}
   annotations:
-    # PreSync, same wave as postgres-pvc.yaml/postgres-statefulset.yaml —
-    # see postgres-pvc.yaml's comment for why.
-    argocd.argoproj.io/hook: PreSync
+    # sync-wave (not a PreSync hook), same wave as postgres-pvc.yaml/
+    # postgres-statefulset.yaml — see postgres-pvc.yaml's comment for why
+    # this must not be a hook.
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   clusterIP: None
