@@ -33,6 +33,16 @@ spec:
           # Same image as the Deployment — only the command differs.
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          # See backend-deployment.yaml's matching securityContext comment —
+          # /tmp covers alembic/python-multipart's incidental scratch use.
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           # seed_admin is idempotent (skips if the user already exists), so
           # chaining it after every migration is safe -- this is what makes
           # a freshly-synced environment actually loggable-into, instead of
@@ -49,3 +59,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secretName }}
                   key: DATABASE_URL
+      volumes:
+        - name: tmp
+          emptyDir: {}
