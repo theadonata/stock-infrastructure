@@ -10,7 +10,7 @@ backend:
     CORS_ORIGINS: "http://stock-hpp.staging.lan,https://stock-hpp.staging.lan"
 frontend:
   image:
-    tag: 2d11a62e7663d7f12fbd230b47cb41f317d6ccb8
+    tag: 745ef452333bf93131d705ee757298131d326898
   config:
     # Protocol-relative (no scheme), and no /api/v1 -- client.ts appends its
     # own "/api/v1" prefix, and browsers that auto-upgrade http:// page
