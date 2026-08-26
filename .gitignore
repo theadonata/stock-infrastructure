@@ -14,6 +14,11 @@ terraform/**/crash.*.log
 # .terraform.lock.hcl is intentionally NOT ignored — commit it so
 # `terraform init` resolves the same provider versions every time.
 
+# Repo-specific — Terragrunt (see terraform/root.hcl). Ephemeral copy of the
+# module tree Terragrunt runs Terraform from; never has anything worth
+# committing (the real state lives at the paths ignored above, not here).
+terraform/**/.terragrunt-cache/
+
 # Sealed Secrets private key backup (runbook.md §1 step 3) — plaintext
 # key material, must never be committed even accidentally via `git add -A`.
 sealed-secrets-key-backup.yaml

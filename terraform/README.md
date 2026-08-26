@@ -6,6 +6,7 @@ namespaces, Argo CD Applications).
 
 ```
 terraform/
+├── root.hcl                    # shared Terragrunt root — see "Terragrunt" below
 ├── modules/
 │   ├── k3s/                    # installs k3s on the local machine (local-exec)
 │   ├── namespace/            # generic kubernetes_namespace, reused by dev/staging
@@ -23,6 +24,44 @@ terraform/
 Each `environments/<env>/` is its own Terraform root module with its own
 state (`backend.tf`, local state — see that file for why) — they are applied
 independently, in this order:
+
+## Terragrunt
+
+Each `environments/<env>/` also has a `terragrunt.hcl` that `include`s the
+shared `root.hcl` and declares its dependency on the environment before it
+(`k3s` → `bootstrap` → `{dev, staging}`, matching the phase order below).
+This is orchestration only — every environment's own `versions.tf`,
+`providers.tf`, `main.tf`, and `variables.tf` stay exactly as they were,
+untouched by Terragrunt. The one thing `root.hcl` does generate is the
+`backend.tf` block, with an **absolute** path
+(`${get_terragrunt_dir()}/terraform.tfstate`) rather than each
+environment's own relative one — Terragrunt always runs Terraform from a
+copied working directory (`.terragrunt-cache/...`), so a relative backend
+path would silently point at a new, empty state file inside that copy
+instead of the real one. Confirmed safe against the real state on this
+machine: every environment plans identically under Terragrunt as it does
+under plain `terraform`, and none of their `terraform.tfstate` files change
+just from running `plan`.
+
+Run everything in dependency order with one command from this directory
+(`environments/`):
+
+```bash
+terragrunt run --all --non-interactive -- plan -input=false -lock=false
+terragrunt run --all -- apply
+```
+
+Or `cd` into a single environment and use `terragrunt <command>` exactly
+like `terraform <command>` (`terragrunt init`, `terragrunt plan`,
+`terragrunt apply`) — useful when you only want to touch one environment,
+e.g. re-running `dev` after changing its Application definition without
+touching `staging`.
+
+Plain `terraform` (no Terragrunt) still works unmodified in each
+`environments/<env>/` directory too — nothing here requires Terragrunt,
+it just removes the need to `cd` through each phase by hand and documents
+the apply order as code (the `dependencies` block) instead of only in this
+README.
 
 ## 0. k3s (once — only if the cluster runs on this same machine)
 
