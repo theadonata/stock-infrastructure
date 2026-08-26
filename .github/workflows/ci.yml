@@ -60,20 +60,29 @@ jobs:
           terraform_version: "1.15.8"
           terraform_wrapper: false
 
-      # -backend=false: every environment here uses local state (see
-      # terraform/README.md) and the real target is a homelab cluster CI
-      # can't reach, so there's no real backend/state for CI to initialize
-      # against — this only downloads provider plugins for `validate`.
-      # No -upgrade: must honor the committed .terraform.lock.hcl exactly,
-      # so a versions.tf bump without a matching lock-file update fails
-      # loudly here instead of drifting silently.
-      - name: terraform init (no backend)
-        working-directory: terraform/environments/${{ matrix.environment }}
-        run: terraform init -backend=false
+      # Each environments/<env>/ is now just a terragrunt.hcl (see
+      # terraform/README.md) — the real Terraform config it points at
+      # (required_providers, resources) lives one level up in
+      # terraform/modules/*-environment/. Plain `terraform validate` here
+      # would silently succeed on an empty directory and check nothing, so
+      # this now runs `terragrunt validate` instead — pinned to the same
+      # version used locally (terraform/README.md's "Provider versions").
+      # It also generates the same backend.tf as a real run, and Terragrunt
+      # always uses a genuinely local backend for the state Terraform
+      # touches during `validate` (an ephemeral runner-local file, not the
+      # real homelab cluster's state) — same "no real target CI can reach"
+      # reasoning the old -backend=false comment described, just satisfied
+      # differently.
+      - name: Set up Terragrunt
+        run: |
+          curl -sSL -o /usr/local/bin/terragrunt \
+            https://github.com/gruntwork-io/terragrunt/releases/download/v1.1.3/terragrunt_linux_amd64
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
 
-      - name: terraform validate
+      - name: terragrunt validate
         working-directory: terraform/environments/${{ matrix.environment }}
-        run: terraform validate
+        run: terragrunt validate --non-interactive
 
   helm:
     name: Helm lint & template (${{ matrix.overlay }})

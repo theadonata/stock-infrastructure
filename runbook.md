@@ -108,6 +108,7 @@ set:
 | `kubectl` | `kubectl version --client` | Talks to the Kubernetes cluster — checking status, viewing logs, etc. This is the tool you'll use the most. |
 | `helm` | `helm version` | Works with the Helm chart. Mostly used here to double-check the chart is valid before Argo CD uses it. |
 | `terraform` (>= 1.9) | `terraform version` | Sets up Argo CD, Sealed Secrets, and (optionally) k3s itself, in a repeatable way. |
+| `terragrunt` | `terragrunt --version` | Orchestrates Terraform across `k3s`/`bootstrap`/`dev`/`staging`/`monitoring` and generates each one's backend config — required, not optional; plain `terraform` has no config to run in `terraform/environments/<env>/` any more (see `terraform/README.md`). |
 | `kubeseal` | `kubeseal --version` | Encrypts secrets (passwords, API keys) before they're safe to put in git. |
 
 **`~/.kube/config`** — a file that tells `kubectl` and `terraform` which
@@ -121,7 +122,7 @@ box): Terraform needs limited permission to run a few commands as an
 administrator (`sudo`) without stopping to ask for your password each
 time. This is because Terraform runs unattended — it can't pause mid-run
 and wait for you to type a password into a hidden prompt. Set this up
-**once**, before that first `terraform apply`:
+**once**, before that first `terragrunt apply`:
 
 ```bash
 cat <<EOF | sudo tee /etc/sudoers.d/k3s-terraform
@@ -143,7 +144,7 @@ single-operator machine, but worth knowing rather than glossing over. See
 ```bash
 sudo -n -l | grep k3s-uninstall.sh
 ```
-(grep for `k3s-uninstall.sh` — that's the command `terraform destroy` in
+(grep for `k3s-uninstall.sh` — that's the command `terragrunt destroy` in
 `terraform/environments/k3s` depends on to run non-interactively, so it's
 worth confirming specifically, not just install/read. The string
 `k3s-terraform` only appears in the sudoers *file's name*
@@ -193,7 +194,7 @@ something fails partway through, stop and fix it (see §7) before moving
 on; later steps assume earlier ones actually worked.
 
 **Shortcut:** `scripts/bootstrap-cluster.sh` runs steps 1, 2, 6, and 7
-below for you in order (`terraform init`/`apply` in `k3s` →
+below for you in order (`terragrunt init`/`apply` in `k3s` →
 `bootstrap` → `dev` → `staging`), instead of `cd`-ing into each
 `terraform/environments/<env>` directory by hand. It also generates step
 4's sealed secrets automatically from `.env.local` (see step 4 below) —
@@ -213,15 +214,16 @@ that goes wrong. If the cluster runs on a separate machine, use
    for a first-time local setup):
    ```bash
    cd terraform/environments/k3s
-   terraform init
-   terraform apply   # requires the sudo setup from §0 above
+   terragrunt init
+   terragrunt apply   # requires the sudo setup from §0 above
    ```
-   `terraform init` downloads the plugins Terraform needs (only required
-   the first time, or after changing versions); `terraform apply` actually
+   `terragrunt init` downloads the plugins Terraform needs (only required
+   the first time, or after changing versions); `terragrunt apply` actually
    does the work, and will ask you to type `yes` to confirm before it
-   makes any changes. If the cluster instead runs on a **separate**
-   machine, follow `bootstrap/k3s-install.md` by hand on that machine
-   instead.
+   makes any changes. (Plain `terraform` won't work here — see
+   `terraform/README.md`'s "Terragrunt" section for why.) If the cluster
+   instead runs on a **separate** machine, follow `bootstrap/k3s-install.md`
+   by hand on that machine instead.
 
    Either way, confirm it worked:
    ```bash
@@ -237,10 +239,13 @@ that goes wrong. If the cluster runs on a separate machine, use
    changes; Sealed Secrets lets passwords live safely in git.
    ```bash
    cd terraform/environments/bootstrap
-   cp terraform.tfvars.example terraform.tfvars   # only edit this if your kubeconfig isn't at ~/.kube/config
-   terraform init
-   terraform apply
+   terragrunt init
+   terragrunt apply
    ```
+   (If your kubeconfig isn't at `~/.kube/config`, override it via
+   `TF_VAR_kubeconfig_path=/path/to/kubeconfig terragrunt apply` instead of
+   editing anything committed — see `terraform/modules/bootstrap-environment/
+   variables.tf` for the full set of overridable variables.)
    Confirm:
    ```bash
    kubectl get pods -n argocd            # everything listed should say Running
@@ -304,12 +309,10 @@ that goes wrong. If the cluster runs on a separate machine, use
    "here's an app to watch and keep deployed":
    ```bash
    cd terraform/environments/dev
-   cp terraform.tfvars.example terraform.tfvars
-   terraform init && terraform apply
+   terragrunt init && terragrunt apply
 
    cd ../staging
-   cp terraform.tfvars.example terraform.tfvars
-   terraform init && terraform apply
+   terragrunt init && terragrunt apply
    ```
 
 7. **Verify both Applications registered:**
@@ -530,12 +533,12 @@ limit of this setup, not something you can fix by just bumping a number.
 | Backend pods `CrashLoopBackOff` | Wrong `DATABASE_URL`/`JWT_SECRET` in the sealed secret, or the database isn't ready yet | `kubectl logs -n stock-hpp-<env> deploy/stock-hpp-backend` |
 | Website returns 502/504 | The backend or frontend has no healthy pods to send traffic to | `kubectl get endpoints -n stock-hpp-<env>` |
 | `kubeseal` command fails | Not pointed at the right cluster, or the Sealed Secrets controller isn't running | `kubectl get pods -n sealed-secrets`; `kubeseal --fetch-cert` to test the connection |
-| `terraform apply` in `dev`/`staging` fails mentioning a missing CRD/type for "Application" | `terraform/environments/bootstrap` (which installs Argo CD) wasn't applied yet, or isn't finished starting up | `kubectl get pods -n argocd` — all should say Running, then retry |
+| `terragrunt apply` in `dev`/`staging` fails mentioning a missing CRD/type for "Application" | `terraform/environments/bootstrap` (which installs Argo CD) wasn't applied yet, or isn't finished starting up | `kubectl get pods -n argocd` — all should say Running, then retry |
 | Browser shows a CORS error in the console | `CORS_ORIGINS` in `values-<env>.yaml` doesn't match the actual website address | Compare `backend.env.CORS_ORIGINS` and `ingress.host` in that environment's values file |
-| `terraform apply` in `environments/bootstrap` errors mentioning "timed out waiting for the condition" (redis, server, etc.) | Not a real failure — a first-time Argo CD install has to pull ~7 images with nothing cached, which can take longer than the configured wait timeout; Kubernetes keeps going in the background regardless of whether Terraform is still watching | `kubectl get pods -n argocd` — if everything's `1/1 Running`, you're fine; re-run `terraform apply`, it'll show "No changes" since the install already succeeded |
+| `terragrunt apply` in `environments/bootstrap` errors mentioning "timed out waiting for the condition" (redis, server, etc.) | Not a real failure — a first-time Argo CD install has to pull ~7 images with nothing cached, which can take longer than the configured wait timeout; Kubernetes keeps going in the background regardless of whether Terraform is still watching | `kubectl get pods -n argocd` — if everything's `1/1 Running`, you're fine; re-run `terragrunt apply`, it'll show "No changes" since the install already succeeded |
 | `scripts/bootstrap-cluster.sh` says "waiting for pods in argocd to be Ready" and times out even though `kubectl get pods -n argocd` shows everything `1/1 Running` | Argo CD's chart includes a one-shot Job (`argocd-redis-secret-init`); once its pod completes, Kubernetes marks it `Ready=False` permanently (it's done, not pending) — an unfiltered wait for "all pods Ready" waits forever for a pod that will never be Ready again | Already fixed in the script (excludes completed pods from the wait) — if you're on an older copy, `git pull`/re-copy the script, or just `kubectl get pods -n argocd` yourself and move on if everything real is Running |
-| `terraform apply` in `environments/k3s` fails immediately mentioning sudo/password | The passwordless-sudo setup from §0 wasn't done, or was typed slightly wrong | `sudo -n -l \| grep k3s-install.sh` — should print a line listing all 3 commands; redo the §0 steps if empty |
-| `terraform destroy` in `environments/k3s` hangs or fails mentioning sudo/password | Same setup, but specifically missing the uninstall permission | `sudo -n -l \| grep k3s-uninstall.sh` — should print the same line as above; redo the §0 steps if empty |
+| `terragrunt apply` in `environments/k3s` fails immediately mentioning sudo/password | The passwordless-sudo setup from §0 wasn't done, or was typed slightly wrong | `sudo -n -l \| grep k3s-install.sh` — should print a line listing all 3 commands; redo the §0 steps if empty |
+| `terragrunt destroy` in `environments/k3s` hangs or fails mentioning sudo/password | Same setup, but specifically missing the uninstall permission | `sudo -n -l \| grep k3s-uninstall.sh` — should print the same line as above; redo the §0 steps if empty |
 | Grafana/Alertmanager pods `CrashLoopBackOff` or stuck `ContainerCreating` right after the monitoring Application first syncs | The two SealedSecrets (§10) haven't been generated/committed yet, so `monitoring-grafana-admin`/`monitoring-alertmanager-config` don't exist for the pod to mount | `kubectl get secrets -n monitoring`; run `./scripts/generate-monitoring-secrets.sh` and PR the result if they're missing |
 | Alertmanager not posting to Discord | Placeholder `DISCORD_WEBHOOK_URL` never got replaced with a real one before generating the sealed secret | `kubectl -n monitoring exec statefulset/alertmanager-monitoring-kube-prometheus-alertmanager -- cat /etc/alertmanager/config_out/alertmanager.env.yaml` (the Prometheus Operator realizes an Alertmanager CR as a StatefulSet, not a Deployment — or check Alertmanager's own UI/logs for delivery errors); regenerate per §10 with a real webhook URL |
 | No logs showing up in Grafana's Loki datasource | Alloy isn't running on the node, or can't reach Loki | `kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy -o wide` (should be one per node); `kubectl logs -n monitoring -l app.kubernetes.io/name=alloy` for connection errors to `loki:3100` |
@@ -550,16 +553,16 @@ limit of this setup, not something you can fix by just bumping a number.
   real gap, not an oversight left for later reading: if you're going to
   put real data in here, back up the database yourself (e.g. a scheduled
   `pg_dump`) until this gets built properly.
-- **Terraform's own state files live only on this machine**
-  (`terraform/environments/*/backend.tf` explains why). If this machine is
-  lost, Terraform "forgets" what it already set up — the cluster itself
-  keeps running fine, but a future `terraform apply` from a fresh checkout
-  would try to create everything again from scratch and collide with what
-  already exists. Back up the `terraform.tfstate` files alongside the
-  Sealed Secrets key (§1 step 3) if this matters to you.
+- **Terraform's own state files live only on this machine** (local backend
+  — `terraform/root.hcl`'s `generate "backend"` block explains why). If
+  this machine is lost, Terraform "forgets" what it already set up — the
+  cluster itself keeps running fine, but a future `terragrunt apply` from a
+  fresh checkout would try to create everything again from scratch and
+  collide with what already exists. Back up the `terraform.tfstate` files
+  alongside the Sealed Secrets key (§1 step 3) if this matters to you.
 - **Rebuilding from nothing** = redo §1 top to bottom, or
   `./scripts/bootstrap-cluster.sh` again (it's safe to re-run — each stage
-  is a no-op if nothing changed, same as running `terraform apply` twice
+  is a no-op if nothing changed, same as running `terragrunt apply` twice
   in a row). Everything about *how the app is configured* comes back
   automatically from git once Argo CD is pointed at this repo again — it's
   only the database's actual data and the Sealed Secrets private key that
@@ -579,15 +582,22 @@ limit of this setup, not something you can fix by just bumping a number.
 
 ## 9. Adding a new environment (e.g. production)
 
+Since `terraform/README.md`'s Terragrunt refactor, `dev`/`staging`/
+`monitoring` all share one root module
+(`terraform/modules/app-environment/`) — adding a same-shaped environment
+no longer means copying a directory of `.tf` files, just a new
+`terragrunt.hcl`:
+
 1. Copy `charts/stock-hpp/values-staging.yaml` → `values-production.yaml`,
    and adjust the image tags/hostname/CORS setting inside it.
-2. Copy `terraform/environments/staging/` →
-   `terraform/environments/production/`, and update the app name,
-   destination namespace, values files, and secrets path throughout to say
-   "production" instead of "staging".
+2. Copy `terraform/environments/staging/terragrunt.hcl` →
+   `terraform/environments/production/terragrunt.hcl` (new directory),
+   keeping `source = "${get_terragrunt_dir()}/../..//modules/app-environment"`
+   unchanged — only the `inputs` block (namespace/app name, values files,
+   secrets path) needs updating to say "production" instead of "staging".
 3. `mkdir secrets/production`, then generate its sealed secret following
    §5 above.
-4. `cd terraform/environments/production && terraform init && terraform apply`.
+4. `cd terraform/environments/production && terragrunt init && terragrunt apply`.
 5. Decide deliberately whether production auto-deploys or needs a manual
    sync like staging — don't just copy staging's choice without thinking
    about it.
@@ -614,9 +624,8 @@ applied (§1):
 
 # 3. Register the namespace + Argo CD Application:
 cd terraform/environments/monitoring
-cp terraform.tfvars.example terraform.tfvars
-terraform init
-terraform apply
+terragrunt init
+terragrunt apply
 ```
 
 From here it auto-syncs like `dev` (`syncPolicy.automated`) — every merge
@@ -715,5 +724,9 @@ kubectl logs -n stock-hpp-<env> job/stock-hpp-backend-migrate
 kubectl get deploy -n stock-hpp-<env> -o jsonpath='{.items[*].spec.template.spec.containers[0].image}'
 
 # Terraform, per layer
-cd terraform/environments/{k3s,bootstrap,dev,staging} && terraform plan
+for env in k3s bootstrap dev staging monitoring; do
+  (cd terraform/environments/$env && terragrunt plan)
+done
+# ...or all at once, in dependency order:
+cd terraform/environments && terragrunt run --all --non-interactive -- plan -input=false -lock=false
 ```

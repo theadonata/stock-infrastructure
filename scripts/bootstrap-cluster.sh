@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# bootstrap-cluster.sh — chains together the `terraform apply` steps from
+# bootstrap-cluster.sh — chains together the `terragrunt apply` steps from
 # runbook.md §1 (k3s -> bootstrap -> dev -> staging) so you don't have to
 # cd into each terraform/environments/<env> directory and run init/apply
 # by hand, one at a time.
@@ -12,9 +12,11 @@
 # that for you, so the script pauses and asks you to confirm it's done
 # before continuing on to dev/staging.
 #
-# Every stage still runs exactly the `terraform init`/`apply` commands
+# Every stage still runs exactly the `terragrunt init`/`apply` commands
 # documented in runbook.md §1 — this is a convenience wrapper around that
-# same process, not a different one.
+# same process, not a different one. Terragrunt (not plain `terraform`) is
+# required — each environments/<env>/ is just a terragrunt.hcl now, see
+# terraform/README.md.
 
 set -euo pipefail
 
@@ -31,10 +33,10 @@ usage() {
 Usage: ./scripts/bootstrap-cluster.sh [options]
 
 Options:
-  -y, --yes              Auto-approve every `terraform apply` (skips the
+  -y, --yes              Auto-approve every `terragrunt apply` (skips the
                           interactive "Enter a value: yes" prompt). Without
                           this, each stage still pauses for you to review
-                          the plan and confirm, same as running terraform
+                          the plan and confirm, same as running terragrunt
                           by hand.
   --skip-k3s              Skip installing k3s — use this when the cluster
                           runs on a separate machine (see
@@ -49,7 +51,7 @@ Options:
                           end (runbook.md §1 step 8). Off by default —
                           staging's manual sync is a deliberate gate, not
                           something to wave through silently.
-  --plan-only             Run `terraform plan` instead of `apply` at every
+  --plan-only             Run `terragrunt plan` instead of `apply` at every
                           stage — preview what would happen, change
                           nothing.
   -h, --help              Show this help.
@@ -94,27 +96,23 @@ confirm() {
   esac
 }
 
-run_terraform() {
+run_terragrunt() {
   # $1 = environment name under terraform/environments/
   local dir="$REPO_ROOT/terraform/environments/$1"
-  banner "terraform: $1"
+  banner "terragrunt: $1"
   cd "$dir"
 
-  if [ -f terraform.tfvars.example ] && [ ! -f terraform.tfvars ]; then
-    cp terraform.tfvars.example terraform.tfvars
-  fi
-
-  terraform init -input=false
+  terragrunt init -input=false
 
   if [ "$PLAN_ONLY" = true ]; then
-    terraform plan
+    terragrunt plan
     return 0
   fi
 
   if [ "$AUTO_APPROVE" = true ]; then
-    terraform apply -auto-approve
+    terragrunt apply -auto-approve
   else
-    terraform apply
+    terragrunt apply
   fi
 }
 
@@ -135,10 +133,12 @@ wait_for_pods() {
 
 banner "checking required tools"
 require_cmd terraform
+require_cmd terragrunt
 require_cmd kubectl
 require_cmd helm
 require_cmd kubeseal
 terraform version | head -1
+terragrunt --version
 kubectl version --client | head -1
 
 # --- stage 1: k3s ----------------------------------------------------------
@@ -151,7 +151,7 @@ if [ "$SKIP_K3S" = true ]; then
     exit 1
   }
 else
-  run_terraform k3s
+  run_terragrunt k3s
   if [ "$PLAN_ONLY" != true ]; then
     banner "waiting for the node to be Ready"
     # `kubectl wait --all` only waits for objects that already exist to
@@ -173,7 +173,7 @@ fi
 
 # --- stage 2: bootstrap (Argo CD + Sealed Secrets) -------------------------
 
-run_terraform bootstrap
+run_terragrunt bootstrap
 if [ "$PLAN_ONLY" != true ]; then
   wait_for_pods argocd
   wait_for_pods sealed-secrets
@@ -216,8 +216,8 @@ fi
 
 # --- stage 3 & 4: dev + staging Applications --------------------------------
 
-run_terraform dev
-run_terraform staging
+run_terragrunt dev
+run_terragrunt staging
 
 if [ "$PLAN_ONLY" = true ]; then
   banner "plan-only run finished — nothing was changed"

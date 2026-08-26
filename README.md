@@ -71,10 +71,10 @@ Postgres StatefulSet).
   rollback, secret rotation, troubleshooting, and disaster-recovery gaps.
   **Start here** — both for first-time setup and day-to-day use.
 - `scripts/bootstrap-cluster.sh` — wrapper script that runs the first-time
-  bootstrap's `terraform apply` steps in order (`k3s` → `bootstrap` →
+  bootstrap's `terragrunt apply` steps in order (`k3s` → `bootstrap` →
   `dev` → `staging`) instead of doing each one by hand; see `runbook.md`
   §1. Supports `--plan-only` for a dry run.
-- `scripts/destroy-cluster.sh` — the reverse: `terraform destroy` in order
+- `scripts/destroy-cluster.sh` — the reverse: `terragrunt destroy` in order
   (`staging` → `dev` → `bootstrap` → `k3s`), with a "type DESTROY to
   confirm" gate. `--keep-k3s` tears down just the app layer (useful for
   re-testing bootstrap without reinstalling k3s); `--plan-only` previews
