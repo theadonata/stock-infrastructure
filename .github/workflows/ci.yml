@@ -114,6 +114,16 @@ jobs:
       # Unlike charts/stock-hpp, this chart declares real dependencies
       # (Chart.yaml) — fetch them into charts/monitoring/charts/ before
       # lint/template, same as Argo CD's own repo-server does at sync time.
+      # `helm dependency build` resolves Chart.lock's repository URLs
+      # against the *local* repo config, not the URLs directly — on a
+      # fresh runner with no `helm repo add` yet, it fails with "no
+      # repository definition for ...". Confirmed by reproducing this
+      # exact failure locally in a clean HELM_CONFIG_HOME.
+      - name: helm repo add
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+
       - name: helm dependency build
         run: helm dependency build charts/monitoring
 
