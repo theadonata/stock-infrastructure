@@ -1,0 +1,33 @@
+apiVersion: v2
+name: monitoring
+description: >-
+  Shared Prometheus + Grafana + Loki + Alloy + Alertmanager stack for the
+  homelab cluster — one instance covering both stock-hpp-dev and
+  stock-hpp-staging, not duplicated per environment. Pulls in upstream
+  charts as dependencies rather than hand-rolling manifests (unlike
+  Postgres in ../stock-hpp — see ../../docs/adr/0003-observability-stack.md
+  for why), synced by Argo CD as a single-source Application so this
+  chart's own SealedSecrets (templates/*.sealed.yaml) never hit the
+  cross-source sync-wave ordering bug stock-hpp already did.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  # Prometheus + Grafana + Alertmanager, one chart. Pinned explicitly (not
+  # left floating) — see ../../terraform/README.md's "Provider versions"
+  # section for why this repo pins rather than tracks latest.
+  - name: kube-prometheus-stack
+    version: "88.5.4"
+    repository: "https://prometheus-community.github.io/helm-charts"
+  # Log storage/query backend for Alloy's shipped logs, single-binary mode
+  # (see values.yaml) — no object storage service exists in this homelab.
+  - name: loki
+    version: "7.3.0"
+    repository: "https://grafana.github.io/helm-charts"
+  # Log shipping agent (successor to Promtail/grafana-agent) — ships every
+  # pod's stdout/stderr to Loki. Deliberately not also configured for
+  # traces/metrics collection here: Tempo is deferred (see Chart
+  # description above), and Prometheus already scrapes metrics directly.
+  - name: alloy
+    version: "1.12.0"
+    repository: "https://grafana.github.io/helm-charts"

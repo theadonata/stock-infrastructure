@@ -1,0 +1,189 @@
+# Shared homelab observability stack — see
+# ../../docs/adr/0003-observability-stack.md for why these four tools, why
+# upstream charts instead of hand-rolled manifests, and why single-source.
+# No values-dev.yaml/values-staging.yaml split (unlike ../stock-hpp): this
+# is one instance covering both environments, not phased per environment.
+#
+# Every top-level key here nests into the matching Helm dependency
+# (Chart.yaml) by its dependency name, so e.g. `loki.singleBinary` sets the
+# `singleBinary` value inside the `loki` subchart itself, and
+# `loki.loki.storage` sets that subchart's own top-level `loki:` config
+# block (its `loki.storage` value) — the doubled `loki.loki.*` nesting looks
+# odd but is correct, not a typo.
+
+# -----------------------------------------------------------------------
+# kube-prometheus-stack: Prometheus + Grafana + Alertmanager
+# -----------------------------------------------------------------------
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      # 15d, not the chart's 10d default: cheap to raise on local-path disk,
+      # and more useful for a homelab where nobody's paged at 3am to look at
+      # a dashboard the same day something broke.
+      retention: 15d
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: local-path # k3s' built-in local-path-provisioner
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+
+  alertmanager:
+    alertmanagerSpec:
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: local-path
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 2Gi
+      # Supplies the full Alertmanager config (route + Discord receiver)
+      # from our own SealedSecret instead of `alertmanager.config` below,
+      # so the webhook URL never sits in this repo as plaintext. See
+      # templates/alertmanager-config-secret.sealed.yaml and its README.
+      configSecret: monitoring-alertmanager-config
+
+  grafana:
+    adminUser: admin
+    admin:
+      # See templates/grafana-admin-secret.sealed.yaml. Keys match this
+      # block's own userKey/passwordKey defaults (admin-user/admin-password)
+      # so they're left unset here.
+      existingSecret: monitoring-grafana-admin
+    persistence:
+      # Grafana's own dashboard/user-prefs DB — the chart's default is
+      # ephemeral (lost on pod restart). Dashboards themselves don't
+      # actually depend on this (sidecar.dashboards below provisions them
+      # from ConfigMaps every time, so they survive even if this PVC is
+      # ever lost or recreated), but alert-silence state and anything
+      # clicked together in the UI would otherwise vanish on every restart.
+      enabled: true
+      type: sts
+      storageClassName: local-path
+      accessModes: ["ReadWriteOnce"]
+      size: 1Gi
+    ingress:
+      enabled: true
+      ingressClassName: traefik # k3s' built-in ingress controller
+      hosts:
+        - grafana.dev.lan
+    sidecar:
+      dashboards:
+        # Default in this chart already (enabled: true) — restated so the
+        # "ConfigMaps, not hand-built in the UI" decision in the ADR is
+        # visible here rather than only implied by an unmodified default.
+        enabled: true
+      datasources:
+        # Ships with a Prometheus + Alertmanager datasource by default;
+        # Loki is added explicitly below since it's not a dependency this
+        # chart knows about on its own.
+        enabled: true
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        access: proxy
+        # fullnameOverride below pins this to a stable, predictable Service
+        # name instead of the chart-computed default.
+        url: http://loki.monitoring.svc.cluster.local:3100
+
+# -----------------------------------------------------------------------
+# Loki: log storage/query backend, single-binary mode (filesystem storage,
+# no object-storage service exists in this homelab — see
+# ../../docs/adr/0003-observability-stack.md's Postgres comparison for the
+# same reasoning: no realistic external managed alternative here).
+# -----------------------------------------------------------------------
+loki:
+  fullnameOverride: loki # stable Service name, referenced by Alloy and Grafana's datasource above
+  deploymentMode: SingleBinary
+  loki:
+    auth_enabled: false # single tenant — no multi-tenant use case here
+    commonConfig:
+      replication_factor: 1 # single binary, single replica: no HA to replicate across
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: local-path
+  # SingleBinary mode above renders none of these — zeroed explicitly
+  # anyway, since the chart's own validation (templates/validate.yaml)
+  # checks these values directly rather than deriving from deploymentMode.
+  write:
+    replicas: 0
+  read:
+    replicas: 0
+  backend:
+    replicas: 0
+  # nginx gateway in front of Loki, needed for multi-tenant auth routing —
+  # not needed with auth_enabled: false and a single binary.
+  gateway:
+    enabled: false
+  # Helm test hook + its canary log-generator: exercise the install after
+  # `helm install/upgrade`, but Argo CD renders via `helm template` only
+  # (never runs Helm's own hook lifecycle — see
+  # ../../docs/adr/0002-gitops-deployment-architecture.md), so both are
+  # dead weight here.
+  test:
+    enabled: false
+  lokiCanary:
+    enabled: false
+
+# -----------------------------------------------------------------------
+# Alloy: ships every pod's stdout/stderr to Loki. DaemonSet by default
+# (one Alloy per node) — unmodified from the chart's default.
+# -----------------------------------------------------------------------
+alloy:
+  alloy:
+    configMap:
+      create: true
+      content: |-
+        // Discover every Pod on this node, label each log stream with its
+        // namespace/pod/container so Grafana's Loki datasource can filter
+        // on them the same way `kubectl logs` does.
+        discovery.kubernetes "pods" {
+          role = "pod"
+        }
+
+        discovery.relabel "pods" {
+          targets = discovery.kubernetes.pods.targets
+
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+        }
+
+        loki.source.kubernetes "pods" {
+          targets    = discovery.relabel.pods.output
+          forward_to = [loki.write.default.receiver]
+        }
+
+        loki.write "default" {
+          endpoint {
+            // Matches loki.fullnameOverride above — same namespace, so no
+            // FQDN needed.
+            url = "http://loki:3100/loki/api/v1/push"
+          }
+        }
