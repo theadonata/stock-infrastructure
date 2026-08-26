@@ -46,14 +46,27 @@ _Avoid_: "the postgres image" unqualified — always distinguish it from a
 stock/third-party Postgres image when it matters (e.g. deciding what a bump
 job is responsible for).
 
-**Monitoring stack**:
+**Homelab monitoring stack**:
 The shared Prometheus + Grafana + Loki + Alloy + Alertmanager deployment in
 the `monitoring` namespace (see `0003-observability-stack.md`), synced from
 one single-source Argo CD Application. One instance covers both
 `stock-hpp-dev` and `stock-hpp-staging` — it is not duplicated per
 environment the way the app itself is. Does not include tracing (Tempo is
 deferred until an app actually emits traces).
-_Avoid_: "observability stack" as a project-specific term — fine as a
-general description, but "monitoring stack"/"the monitoring namespace" is
-what this project actually calls it, matching the namespace/Application
-name.
+_Avoid_: "monitoring stack" unqualified once an AWS environment exists —
+say "homelab monitoring stack" to distinguish it from the **AWS
+observability stack** (below). Before the AWS decision, "monitoring
+stack"/"the monitoring namespace" was the unqualified project term,
+matching the namespace/Application name; that's now ambiguous.
+
+**AWS observability stack**:
+The managed-service observability layer for the AWS production/DR
+environment: Amazon Managed Prometheus + Amazon Managed Grafana +
+CloudWatch Logs. Deliberately not the same technology as the **homelab
+monitoring stack** — AWS has managed-service alternatives that don't exist
+in a homelab context, so the two environments diverge here on purpose
+rather than by accident. CloudWatch health checks feeding Route53 are the
+automated-failover trigger (see the AWS deployment ADRs) and must stay
+independent of anything running inside the primary region's own cluster.
+_Avoid_: "monitoring stack" unqualified — always say "AWS observability
+stack" to distinguish it from the homelab's Prometheus/Grafana/Loki stack.
