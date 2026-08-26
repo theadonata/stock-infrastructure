@@ -22,3 +22,10 @@ terraform/**/.terragrunt-cache/
 # Sealed Secrets private key backup (runbook.md §1 step 3) — plaintext
 # key material, must never be committed even accidentally via `git add -A`.
 sealed-secrets-key-backup.yaml
+
+# Repo-specific — Helm chart dependencies (see charts/monitoring/Chart.yaml).
+# `helm dependency build` re-downloads these from Chart.lock's pinned
+# versions/digests every time (CI does this — see .github/workflows/ci.yml),
+# so the tarballs themselves aren't worth committing; Chart.lock is (same
+# reasoning as .terraform.lock.hcl above — not ignored).
+charts/**/charts/*.tgz

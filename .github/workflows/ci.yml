@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false # environments are independent; one failing shouldn't hide the others
       matrix:
-        environment: [k3s, bootstrap, dev, staging]
+        environment: [k3s, bootstrap, dev, staging, monitoring]
     steps:
       - uses: actions/checkout@v7
 
@@ -97,6 +97,31 @@ jobs:
 
       - name: helm template
         run: helm template charts/stock-hpp -f charts/stock-hpp/values.yaml -f charts/stock-hpp/values-${{ matrix.overlay }}.yaml
+
+  helm-monitoring:
+    name: Helm lint & template (monitoring)
+    runs-on: ubuntu-latest
+    # No overlay matrix here — one values.yaml covers both environments (see
+    # docs/adr/0003-observability-stack.md), unlike charts/stock-hpp above.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.21.4
+
+      # Unlike charts/stock-hpp, this chart declares real dependencies
+      # (Chart.yaml) — fetch them into charts/monitoring/charts/ before
+      # lint/template, same as Argo CD's own repo-server does at sync time.
+      - name: helm dependency build
+        run: helm dependency build charts/monitoring
+
+      - name: helm lint
+        run: helm lint charts/monitoring -f charts/monitoring/values.yaml
+
+      - name: helm template
+        run: helm template charts/monitoring -f charts/monitoring/values.yaml
 
   shellcheck:
     name: Shellcheck (scripts/)
@@ -155,9 +180,9 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis
     runs-on: ubuntu-latest
-    # Gates on all three lint/validate jobs collectively — there's no single
+    # Gates on all lint/validate jobs collectively — there's no single
     # "test" job here the way the sibling app repos have.
-    needs: [terraform-validate, helm, shellcheck]
+    needs: [terraform-validate, helm, helm-monitoring, shellcheck]
     steps:
       - uses: actions/checkout@v7
         with:

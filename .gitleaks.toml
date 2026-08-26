@@ -4,7 +4,12 @@ title = "gitleaks config for stock-infrastructure"
 useDefault = true
 
 [allowlist]
-description = "SealedSecret ciphertext — asymmetrically encrypted, decryptable only by the in-cluster Sealed Secrets controller (see secrets/*/README.md). The default generic-api-key rule flags these purely on key name (JWT_SECRET, POSTGRES_PASSWORD, ...) plus entropy, with no way to tell it's ciphertext, not plaintext."
+description = "SealedSecret ciphertext — asymmetrically encrypted, decryptable only by the in-cluster Sealed Secrets controller (see secrets/*/README.md and charts/monitoring/README.md). The default generic-api-key rule flags these purely on key name (JWT_SECRET, POSTGRES_PASSWORD, ...) plus entropy, with no way to tell it's ciphertext, not plaintext."
 paths = [
   '''secrets/.*\.sealed\.yaml$''',
+  # charts/monitoring/templates/: same ciphertext, but living inside the
+  # chart itself rather than a secrets/<env>/ directory, since the
+  # monitoring stack's Argo CD Application is single-source (see
+  # docs/adr/0003-observability-stack.md).
+  '''charts/.*/templates/.*\.sealed\.yaml$''',
 ]
