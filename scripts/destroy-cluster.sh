@@ -29,7 +29,7 @@ Tears down what scripts/bootstrap-cluster.sh builds, in reverse order:
 staging -> dev -> bootstrap -> k3s.
 
 Options:
-  -y, --yes         Auto-approve every `terraform destroy` AND skip the
+  -y, --yes         Auto-approve every `terragrunt destroy` AND skip the
                      "type DESTROY to confirm" prompt. Use with real care —
                      see the warning at the top of this script.
   --keep-k3s         Destroy staging/dev/bootstrap only — leave k3s (and
@@ -37,7 +37,7 @@ Options:
                      app layer to re-run bootstrap-cluster.sh without
                      reinstalling k3s and waiting through image pulls
                      again.
-  --plan-only        Run `terraform plan -destroy` instead of `destroy` at
+  --plan-only        Run `terragrunt plan -destroy` instead of `destroy` at
                      every stage — preview what would be removed, change
                      nothing.
   -h, --help          Show this help.
@@ -62,20 +62,20 @@ banner() {
 run_destroy() {
   # $1 = environment name under terraform/environments/
   local dir="$REPO_ROOT/terraform/environments/$1"
-  banner "terraform destroy: $1"
+  banner "terragrunt destroy: $1"
   cd "$dir"
 
-  terraform init -input=false
+  terragrunt init -input=false
 
   if [ "$PLAN_ONLY" = true ]; then
-    terraform plan -destroy
+    terragrunt plan -destroy
     return 0
   fi
 
   if [ "$AUTO_APPROVE" = true ]; then
-    terraform destroy -auto-approve
+    terragrunt destroy -auto-approve
   else
-    terraform destroy
+    terragrunt destroy
   fi
 }
 

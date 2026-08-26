@@ -3,7 +3,7 @@
 Only applies when the cluster will run on a **separate** box from wherever
 you run Terraform — a homelab machine you'd otherwise have to SSH into. If
 Terraform runs on the same machine the cluster will live on, use
-`../terraform/environments/k3s/` instead (`terraform apply` there installs
+`../terraform/environments/k3s/` instead (`terragrunt apply` there installs
 k3s via a scoped, passwordless-sudo `local-exec` provisioner — see
 `../terraform/README.md` §0) and skip this file entirely.
 

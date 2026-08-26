@@ -1,6 +1,7 @@
-# Phase 2 of gitops-plan.md: staging namespace + Argo CD Application, manual
-# sync (the deliberate human-gated promotion step). Requires
-# environments/bootstrap to already be applied.
+# Shared by dev, staging, and monitoring (see main.tf) — namespace +
+# Argo CD Application, one per environment. Requires environments/bootstrap
+# to already be applied (Argo CD's Application CRD must exist in the
+# cluster before this runs).
 terraform {
   required_version = ">= 1.9.0"
 

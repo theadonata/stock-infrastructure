@@ -1,3 +1,0 @@
-# Copy to terraform.tfvars (gitignored).
-kubeconfig_path = "~/.kube/config"
-# kube_context  = "default"

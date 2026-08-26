@@ -1,7 +1,0 @@
-# Copy to terraform.tfvars (gitignored — see ../../../.gitignore) and adjust
-# for your machine. terraform.tfvars is machine-specific (kubeconfig path),
-# not secret, but kept out of git the same way .env.local's convention keeps
-# machine-specific values out of shared files.
-
-kubeconfig_path = "~/.kube/config"
-# kube_context  = "default"

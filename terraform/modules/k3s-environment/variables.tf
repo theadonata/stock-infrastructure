@@ -5,7 +5,7 @@ variable "k3s_version" {
 }
 
 variable "kubeconfig_path" {
-  description = "Where to write the kubeconfig. environments/bootstrap, dev, and staging's own kubeconfig_path variables must point at the same path."
+  description = "Where to write the kubeconfig. bootstrap-environment, app-environment (dev/staging/monitoring)'s own kubeconfig_path variables must point at the same path."
   type        = string
   default     = "~/.kube/config"
 }
