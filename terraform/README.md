@@ -12,13 +12,17 @@ terraform/
 │   ├── namespace/            # generic kubernetes_namespace, reused by dev/staging
 │   ├── argocd/                # installs Argo CD (helm_release)
 │   ├── sealed-secrets/         # installs the Sealed Secrets controller (helm_release)
-│   └── argocd-application/     # generic multi-source Argo CD Application CR,
-│                                # parameterized per environment
+│   └── argocd-application/     # generic Argo CD Application CR (multi-source by
+│                                # default, single-source when secrets_path is
+│                                # left unset), parameterized per environment
 └── environments/
     ├── k3s/          # Phase -1 — installs k3s, applied once, before bootstrap
     ├── bootstrap/    # Phase 0 — cluster-wide, applied once, before dev/staging
     ├── dev/          # Phase 1 — namespace + automated-sync Application
-    └── staging/      # Phase 2 — namespace + manual-sync Application
+    ├── staging/      # Phase 2 — namespace + manual-sync Application
+    └── monitoring/   # shared — namespace + single-source Application for
+                       # ../../docs/adr/0003-observability-stack.md; depends
+                       # only on bootstrap, not phased after dev/staging
 ```
 
 Each `environments/<env>/` is its own Terraform root module with its own
@@ -29,7 +33,9 @@ independently, in this order:
 
 Each `environments/<env>/` also has a `terragrunt.hcl` that `include`s the
 shared `root.hcl` and declares its dependency on the environment before it
-(`k3s` → `bootstrap` → `{dev, staging}`, matching the phase order below).
+(`k3s` → `bootstrap` → `{dev, staging, monitoring}`, matching the phase
+order below — `monitoring` depends only on `bootstrap`, the same as `dev`
+and `staging`, not on either of them).
 This is orchestration only — every environment's own `versions.tf`,
 `providers.tf`, `main.tf`, and `variables.tf` stay exactly as they were,
 untouched by Terragrunt. The one thing `root.hcl` does generate is the
@@ -172,6 +178,25 @@ Same shape, but `automated_sync = false` — staging requires an explicit
 promotion PR is merged by hand. This is the deliberate environment-promotion
 gate described in `../docs/adr/0002-gitops-deployment-architecture.md`, on
 top of the PR-merge gate.
+
+## 4. Monitoring (shared, applied once)
+
+```bash
+cd environments/monitoring
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform apply
+```
+
+Creates the `monitoring` namespace and a **single-source** Argo CD
+Application — see `../docs/adr/0003-observability-stack.md` for why this
+one differs from `dev`/`staging` above. Not phased: only depends on
+`bootstrap`, so it can be applied any time after that, independent of
+whether `dev`/`staging` have been. Before relying on it, generate its
+SealedSecrets — `../scripts/generate-monitoring-secrets.sh` (reads real
+values from `../.env.local`) or by hand per
+`../charts/monitoring/README.md` — and commit them; Terraform does not
+create these itself, same reasoning as `secrets/dev/` above.
 
 ## Why Terraform here, and why split this way
 
