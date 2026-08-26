@@ -12,7 +12,7 @@
 # exists so each environment's terragrunt.hcl has an `include` target, and
 # so their `dependencies` blocks (ordering only, no output values consumed)
 # drive `terragrunt run-all` in the same order ../README.md documents by
-# hand: k3s -> bootstrap -> {dev, staging}.
+# hand: k3s -> bootstrap -> {dev, staging, monitoring}.
 #
 # See `../docs/adr/0007-aws-cicd-iac.md` for why AWS environments (once
 # added under a sibling directory) use directory-per-environment Terragrunt

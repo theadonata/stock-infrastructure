@@ -29,6 +29,11 @@ wrapper script (`scripts/bootstrap-cluster.sh`) to drive it. Both `dev` and
 `staging` environments are wired up (dev auto-syncs, staging requires a
 manual sync — see `runbook.md` §1–3).
 
+Also built: a shared Prometheus/Grafana/Loki/Alloy/Alertmanager monitoring
+stack (`charts/monitoring/`), one instance covering both `dev` and
+`staging` — see `docs/adr/0003-observability-stack.md` and `runbook.md`
+§10.
+
 The `bump-dev`/`bump-staging` CI jobs that automate image promotion exist in
 `stock-backend`'s/`stock-frontend`'s `.github/workflows/ci.yml` and are set
 up and verified working end-to-end (both environments' bump PRs auto-merge;
@@ -78,12 +83,19 @@ Postgres StatefulSet).
   `secrets/<env>/backend-secrets.sealed.yaml` from real values in
   `.env.local`, run automatically by `bootstrap-cluster.sh` for whichever
   environment doesn't already have one.
+- `scripts/generate-monitoring-secrets.sh` — the same idea for the
+  monitoring stack's two SealedSecrets (Grafana admin login, Alertmanager's
+  Discord webhook config); see `charts/monitoring/README.md`.
 - `docs/adr/` — architecture decision records: tool choices and why
   (`0002-gitops-deployment-architecture.md`), the cross-repo bump
-  credential (`0001-cross-repo-bump-credential.md`).
+  credential (`0001-cross-repo-bump-credential.md`), the monitoring stack
+  (`0003-observability-stack.md`).
 - `terraform/` — Terraform modules/environments that provision k3s itself,
   Argo CD, Sealed Secrets, namespaces, and the per-environment Argo CD
   Applications.
 - `charts/stock-hpp/` — the umbrella Helm chart Argo CD renders and syncs.
+- `charts/monitoring/` — the shared Prometheus/Grafana/Loki/Alloy/
+  Alertmanager umbrella chart, one instance covering both `dev` and
+  `staging`.
 - `secrets/` — per-environment `SealedSecret` manifests (encrypted, safe to
   commit); see `secrets/dev/README.md` for how to generate them.
