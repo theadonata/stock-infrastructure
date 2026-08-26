@@ -15,7 +15,7 @@ variable "destination_namespace" {
 }
 
 variable "repo_url" {
-  description = "Git URL of this repo (stock-infrastructure) — both the Helm chart and the sealed-secrets directory are sourced from it."
+  description = "Git URL of this repo (stock-infrastructure) — the Helm chart is sourced from it, and (unless secrets_path is left null) so is the sealed-secrets directory."
   type        = string
 }
 
@@ -37,8 +37,9 @@ variable "values_files" {
 }
 
 variable "secrets_path" {
-  description = "Path within the repo to this environment's SealedSecret manifests directory, e.g. secrets/dev."
+  description = "Path within the repo to this environment's SealedSecret manifests directory, e.g. secrets/dev. Leave null for a single-source Application (see docs/adr/0003-observability-stack.md) whose chart already carries its own SealedSecrets — a second source is skipped entirely rather than pointed at an empty/missing directory."
   type        = string
+  default     = null
 }
 
 variable "automated_sync" {
