@@ -62,7 +62,8 @@ open a pull request, and the cluster catches up on its own.
   generates all of them.
 - **Argo CD** — the "robot" described above. An **Application**, in Argo CD
   terms, is just "this path in this git repo maps to this thing running in
-  the cluster." This repo has two: one for dev, one for staging.
+  the cluster." This repo has three: one for dev, one for staging, and one
+  shared monitoring stack (§10) covering both.
 - **Terraform** — a tool for setting up infrastructure in a repeatable,
   scripted way, instead of clicking around a UI or typing one-off commands
   you'll forget later. Here it sets up k3s itself (optionally), Argo CD,
@@ -73,8 +74,9 @@ open a pull request, and the cluster catches up on its own.
   committed is unreadable gibberish that only your specific cluster can
   decrypt.
 - **Namespace** — think of it as a folder inside Kubernetes. This repo uses
-  one namespace for dev (`stock-hpp-dev`) and one for staging
-  (`stock-hpp-staging`) so the two don't interfere with each other.
+  one namespace for dev (`stock-hpp-dev`), one for staging
+  (`stock-hpp-staging`), and one shared `monitoring` namespace, so none of
+  them interfere with each other.
 
 If a term shows up later that isn't explained above, check the
 **Glossary** near the bottom of this doc.
@@ -534,6 +536,9 @@ limit of this setup, not something you can fix by just bumping a number.
 | `scripts/bootstrap-cluster.sh` says "waiting for pods in argocd to be Ready" and times out even though `kubectl get pods -n argocd` shows everything `1/1 Running` | Argo CD's chart includes a one-shot Job (`argocd-redis-secret-init`); once its pod completes, Kubernetes marks it `Ready=False` permanently (it's done, not pending) — an unfiltered wait for "all pods Ready" waits forever for a pod that will never be Ready again | Already fixed in the script (excludes completed pods from the wait) — if you're on an older copy, `git pull`/re-copy the script, or just `kubectl get pods -n argocd` yourself and move on if everything real is Running |
 | `terraform apply` in `environments/k3s` fails immediately mentioning sudo/password | The passwordless-sudo setup from §0 wasn't done, or was typed slightly wrong | `sudo -n -l \| grep k3s-install.sh` — should print a line listing all 3 commands; redo the §0 steps if empty |
 | `terraform destroy` in `environments/k3s` hangs or fails mentioning sudo/password | Same setup, but specifically missing the uninstall permission | `sudo -n -l \| grep k3s-uninstall.sh` — should print the same line as above; redo the §0 steps if empty |
+| Grafana/Alertmanager pods `CrashLoopBackOff` or stuck `ContainerCreating` right after the monitoring Application first syncs | The two SealedSecrets (§10) haven't been generated/committed yet, so `monitoring-grafana-admin`/`monitoring-alertmanager-config` don't exist for the pod to mount | `kubectl get secrets -n monitoring`; run `./scripts/generate-monitoring-secrets.sh` and PR the result if they're missing |
+| Alertmanager not posting to Discord | Placeholder `DISCORD_WEBHOOK_URL` never got replaced with a real one before generating the sealed secret | `kubectl -n monitoring exec statefulset/alertmanager-monitoring-kube-prometheus-alertmanager -- cat /etc/alertmanager/config_out/alertmanager.env.yaml` (the Prometheus Operator realizes an Alertmanager CR as a StatefulSet, not a Deployment — or check Alertmanager's own UI/logs for delivery errors); regenerate per §10 with a real webhook URL |
+| No logs showing up in Grafana's Loki datasource | Alloy isn't running on the node, or can't reach Loki | `kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy -o wide` (should be one per node); `kubectl logs -n monitoring -l app.kubernetes.io/name=alloy` for connection errors to `loki:3100` |
 | **On WSL2 with Docker Desktop:** k3s never becomes Ready — `systemctl status k3s` shows `activating (auto-restart)`, journal says `Failed to start ContainerManager... system validation failed - wrong number of fields (expected 6, got 7)` | Docker Desktop's WSL integration mounts a share whose options string contains an unescaped space (`C:\Program Files\Docker\...`); kubelet's mount-table parser expects exactly 6 fields per line and chokes on the extra one from that space. Known upstream bug: [k3s-io/k3s#4483](https://github.com/k3s-io/k3s/issues/4483) — not something a longer timeout fixes | `grep "Program Files" /proc/mounts` confirms it. Fix (Windows side, not fixable from inside WSL): Docker Desktop → Settings → Resources → WSL Integration → turn **off** the toggle for this distro, then `wsl --shutdown` from PowerShell and reopen. The k3s install itself doesn't need re-running — `terraform state` already has it; just re-run `bootstrap-cluster.sh` afterward and the node-Ready wait will succeed once the service is actually healthy |
 
 ---
@@ -589,6 +594,63 @@ limit of this setup, not something you can fix by just bumping a number.
 
 ---
 
+## 10. Monitoring stack (Grafana/Prometheus/Loki/Alertmanager)
+
+One shared instance covers both `stock-hpp-dev` and `stock-hpp-staging` —
+it isn't phased or duplicated per environment the way the app itself is.
+See `docs/adr/0003-observability-stack.md` for the full design.
+
+**First-time setup**, after `terraform/environments/bootstrap` has been
+applied (§1):
+
+```bash
+# 1. Generate the two SealedSecrets (Grafana admin login, Alertmanager's
+#    Discord webhook). Needs GRAFANA_ADMIN_PASSWORD and DISCORD_WEBHOOK_URL
+#    set in .env.local first — see charts/monitoring/README.md.
+./scripts/generate-monitoring-secrets.sh
+
+# 2. Commit charts/monitoring/templates/*.sealed.yaml via a pull request,
+#    as usual.
+
+# 3. Register the namespace + Argo CD Application:
+cd terraform/environments/monitoring
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform apply
+```
+
+From here it auto-syncs like `dev` (`syncPolicy.automated`) — every merge
+to `main` that touches `charts/monitoring/` rolls out with no further
+Terraform runs, unless the Application's own definition changes (a new
+values file, a different target revision).
+
+**Accessing Grafana**: `http://grafana.dev.lan` (Traefik Ingress, same
+pattern as the app's own `stock-hpp.dev.lan`). Log in with `admin` and
+whatever `GRAFANA_ADMIN_PASSWORD` was set to when the sealed secret was
+generated.
+
+**Rotating the Grafana admin password or the Discord webhook**: edit the
+value in `.env.local`, then re-run
+`./scripts/generate-monitoring-secrets.sh` and PR the result — same shape
+as §5 above, except **both** secrets regenerate together (there's no
+per-secret variant of the script). After Argo CD syncs, Grafana's pod needs
+restarting to notice a changed admin password:
+```bash
+kubectl rollout restart deployment -n monitoring monitoring-grafana
+```
+Alertmanager picks up a changed config secret on its own — it watches the
+mounted secret file and reloads, no restart needed.
+
+**What it does and doesn't cover**: Prometheus (metrics, cluster + node +
+kube-state-metrics), Grafana (dashboards, provisioned from ConfigMaps —
+see the ADR for why, not hand-built in the UI), Loki + Alloy (every pod's
+logs, single-binary/filesystem storage — no object storage service exists
+in this homelab), Alertmanager (routes to a single Discord channel via
+webhook). Does **not** include tracing — Tempo is deferred until
+`stock-backend`/`stock-frontend` actually emit traces.
+
+---
+
 ## Glossary
 
 Quick definitions for terms used above without much explanation, in case
@@ -618,6 +680,12 @@ you land on a section out of order:
   now."
 - **Rollout** — the process of replacing old Pods with new ones when a
   Deployment changes.
+- **Metrics / logs / traces** — the three usual kinds of observability
+  data: metrics are numbers over time (Prometheus), logs are text lines
+  emitted by a program (Loki), traces follow one request across multiple
+  services (not set up here yet — see §10).
+- **Receiver** — Alertmanager's term for "where to send an alert" (here, a
+  Discord webhook).
 
 ---
 
@@ -634,6 +702,7 @@ you land on a section out of order:
 kubectl get applications -n argocd
 kubectl get pods -n stock-hpp-dev -o wide
 kubectl get pods -n stock-hpp-staging -o wide
+kubectl get pods -n monitoring -o wide
 
 # Force a sync
 kubectl patch application stock-hpp-<env> -n argocd --type merge -p '{"operation":{"sync":{}}}'
