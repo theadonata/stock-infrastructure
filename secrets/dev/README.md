@@ -1,28 +1,34 @@
 # secrets/dev/
 
-Holds `backend-secrets.sealed.yaml` — a `SealedSecret` CR, safe to commit
-because its contents are ciphertext only the in-cluster Sealed Secrets
-controller can decrypt. Not managed by Terraform or templated by the Helm
-chart (see `../../docs/adr/0002-gitops-deployment-architecture.md`'s
-tool-selection section for why); this
-directory is applied by Argo CD as the second source in `dev`'s multi-source
-Application (see `../../terraform/modules/argocd-application`).
+This folder holds `backend-secrets.sealed.yaml`, a `SealedSecret` resource.
+It's safe to commit to git — the contents are ciphertext, and only the
+Sealed Secrets controller running in the cluster can decrypt them.
 
-## Generating it (Phase 0, after the Sealed Secrets controller is running)
+It's not managed by Terraform or templated by the Helm chart (see the
+tool-selection section of `../../docs/adr/0002-gitops-deployment-architecture.md`
+if you're curious why). Instead, Argo CD applies this whole directory as the
+second source in `dev`'s multi-source Application — check out
+`../../terraform/modules/argocd-application` for how that's wired up.
 
-**Preferred:** set `DEV_POSTGRES_PASSWORD` and `DEV_JWT_SECRET` in
-`.env.local` (already done — see that file's comment for how they were
-generated), then run:
+## Generating it
+
+You'll do this once the Sealed Secrets controller is up and running
+(Phase 0).
+
+**The easy way:** make sure `DEV_POSTGRES_PASSWORD` and `DEV_JWT_SECRET` are
+set in `.env.local` (they already are — see that file's comment for how they
+were generated), then run:
 
 ```bash
 ./scripts/generate-secrets.sh dev
 ```
 
-That's `secrets/dev/generate-secrets.sh`'s whole job — it's the same
-`kubectl create secret ... | kubeseal ...` command below, reading the real
-values from `.env.local` instead of you typing them in by hand.
+That script doesn't do anything fancy — it's just the same
+`kubectl create secret ... | kubeseal ...` command shown below, pulling the
+real values from `.env.local` so you don't have to type them in by hand.
 
-**By hand**, if you'd rather not keep real values in `.env.local`:
+**Prefer to do it by hand?** No problem — maybe you'd rather not keep real
+values sitting in `.env.local`. Here's the manual version:
 
 ```bash
 kubectl create secret generic stock-hpp-backend-secrets \
@@ -40,13 +46,16 @@ kubeseal --format yaml \
 rm /tmp/backend-secrets.yaml   # never commit the plaintext version
 ```
 
-`--controller-name`/`--controller-namespace` matter: `kubeseal`'s own
-default assumes a controller named `sealed-secrets-controller` in
-`kube-system`, but `terraform/modules/sealed-secrets` installs it as the
-Helm release `sealed-secrets` in the `sealed-secrets` namespace — without
-these flags `kubeseal` fails with "services sealed-secrets-controller not
-found" even though the controller is running fine.
+Don't skip the `--controller-name`/`--controller-namespace` flags — `kubeseal`
+assumes by default that the controller is named `sealed-secrets-controller`
+and lives in `kube-system`, but `terraform/modules/sealed-secrets` actually
+installs it as the Helm release `sealed-secrets` in the `sealed-secrets`
+namespace. Without these flags, `kubeseal` will complain that
+"services sealed-secrets-controller not found" — even though the controller
+is running just fine.
 
-`POSTGRES_PASSWORD` and the password embedded in `DATABASE_URL` must match
-— both are read by different pods (`postgres-statefulset.yaml` and
-`backend-deployment.yaml`/`backend-migrate-job.yaml`) from this same Secret.
+One more thing to watch for: `POSTGRES_PASSWORD` and the password embedded in
+`DATABASE_URL` need to match each other. They're read from this same Secret
+by different pods (`postgres-statefulset.yaml` and
+`backend-deployment.yaml`/`backend-migrate-job.yaml`), so if they drift apart
+things will break in confusing ways.
