@@ -72,15 +72,24 @@ locals {
         # The destination namespace is created by ../namespace, not by Argo CD
         # (no CreateNamespace=true syncOption) — keeps ownership of that
         # resource in exactly one place.
-        syncPolicy = var.automated_sync ? {
-          automated = {
-            prune    = var.prune
-            selfHeal = var.self_heal
-          }
-          } : {
-          # Explicit empty object: no `automated` block means sync only
-          # happens when triggered by hand (staging's human-gated promotion).
-        }
+        #
+        # merge(), not a single ternary with both keys inline, so each
+        # option is independently on/off without four-way duplication —
+        # same reasoning as local.source_block's concat() above.
+        syncPolicy = merge(
+          var.automated_sync ? {
+            automated = {
+              prune    = var.prune
+              selfHeal = var.self_heal
+            }
+            } : {
+            # Explicit empty object: no `automated` block means sync only
+            # happens when triggered by hand (staging's human-gated promotion).
+          },
+          var.server_side_apply ? {
+            syncOptions = ["ServerSideApply=true"]
+          } : {}
+        )
       },
       local.source_block
     )
