@@ -12,7 +12,8 @@
 # the chart itself, not a second source.
 #
 # Requires:
-#   - .env.local with GRAFANA_ADMIN_PASSWORD and DISCORD_WEBHOOK_URL set.
+#   - .env.local with GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, and
+#     DISCORD_WEBHOOK_URL set.
 #   - kubeseal able to reach the cluster's Sealed Secrets controller, i.e.
 #     terraform/environments/bootstrap must already be applied.
 #
@@ -31,8 +32,9 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/generate-monitoring-secrets.sh
 
-Reads GRAFANA_ADMIN_PASSWORD and DISCORD_WEBHOOK_URL from .env.local and
-writes charts/monitoring/templates/{grafana-admin,alertmanager-config}-secret.sealed.yaml.
+Reads GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, and DISCORD_WEBHOOK_URL
+from .env.local and writes
+charts/monitoring/templates/{grafana-admin,alertmanager-config}-secret.sealed.yaml.
 EOF
 }
 
@@ -52,8 +54,8 @@ set -a
 source "$ENV_LOCAL"
 set +a
 
-if [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ] || [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
-  echo "ERROR: GRAFANA_ADMIN_PASSWORD and/or DISCORD_WEBHOOK_URL are missing or empty in $ENV_LOCAL" >&2
+if [ -z "${GRAFANA_ADMIN_USER:-}" ] || [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ] || [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+  echo "ERROR: GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, and/or DISCORD_WEBHOOK_URL are missing or empty in $ENV_LOCAL" >&2
   exit 1
 fi
 
@@ -65,7 +67,7 @@ echo "Generating $OUT_DIR/grafana-admin-secret.sealed.yaml for namespace $NAMESP
 # (admin-user/admin-password) — see charts/monitoring/values.yaml.
 kubectl create secret generic monitoring-grafana-admin \
   --namespace "$NAMESPACE" \
-  --from-literal=admin-user=admin \
+  --from-literal=admin-user="$GRAFANA_ADMIN_USER" \
   --from-literal=admin-password="$GRAFANA_ADMIN_PASSWORD" \
   --dry-run=client -o yaml \
   | kubeseal --format yaml \
