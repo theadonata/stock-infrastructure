@@ -50,7 +50,10 @@ jobs:
     strategy:
       fail-fast: false # environments are independent; one failing shouldn't hide the others
       matrix:
-        environment: [k3s, bootstrap, dev, staging, monitoring]
+        # aws-production/aws-dr (STOCK-6) validate fine here even without a
+        # live Floci - `terragrunt validate` only checks config/schema, it
+        # never calls the provider's configured endpoints.
+        environment: [k3s, bootstrap, dev, staging, monitoring, aws-production, aws-dr]
     steps:
       - uses: actions/checkout@v7
 

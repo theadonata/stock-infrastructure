@@ -18,19 +18,24 @@ terraform/
 │   │                             # around modules/k3s
 │   ├── bootstrap-environment/   # root module for environments/bootstrap — wraps
 │   │                             # modules/argocd + modules/sealed-secrets
-│   └── app-environment/         # root module for environments/{dev,staging,monitoring} —
-│                                 # wraps modules/namespace + modules/argocd-application,
-│                                 # parameterized per environment via Terragrunt `inputs`
-│                                 # (those three were byte-identical apart from the
-│                                 # values passed in)
+│   ├── app-environment/         # root module for environments/{dev,staging,monitoring} —
+│   │                             # wraps modules/namespace + modules/argocd-application,
+│   │                             # parameterized per environment via Terragrunt `inputs`
+│   │                             # (those three were byte-identical apart from the
+│   │                             # values passed in)
+│   └── aws-environment/         # root module for environments/{aws-production,aws-dr} —
+│                                 # aws provider pointed at Floci (../docs/adr/0004-...md),
+│                                 # currently just the STOCK-6 prefactor smoke-test resource
 └── environments/
-    ├── k3s/          # Phase -1 — installs k3s, applied once, before bootstrap
-    ├── bootstrap/    # Phase 0 — cluster-wide, applied once, before dev/staging
-    ├── dev/          # Phase 1 — namespace + automated-sync Application
-    ├── staging/      # Phase 2 — namespace + manual-sync Application
-    └── monitoring/   # shared — namespace + single-source Application for
-                       # ../../docs/adr/0003-observability-stack.md; depends
-                       # only on bootstrap, not phased after dev/staging
+    ├── k3s/            # Phase -1 — installs k3s, applied once, before bootstrap
+    ├── bootstrap/      # Phase 0 — cluster-wide, applied once, before dev/staging
+    ├── dev/            # Phase 1 — namespace + automated-sync Application
+    ├── staging/        # Phase 2 — namespace + manual-sync Application
+    ├── monitoring/     # shared — namespace + single-source Application for
+    │                   # ../../docs/adr/0003-observability-stack.md; depends
+    │                   # only on bootstrap, not phased after dev/staging
+    ├── aws-production/ # AWS production tier (../docs/adr/0004-...md), against Floci for now
+    └── aws-dr/         # AWS DR tier (../docs/adr/0004-...md), against Floci for now
 ```
 
 Each `environments/<env>/` is now just a `terragrunt.hcl` — no committed
@@ -212,6 +217,36 @@ SealedSecrets — `../scripts/generate-monitoring-secrets.sh` (reads real
 values from `../.env.local`) or by hand per
 `../charts/monitoring/README.md` — and commit them; Terraform does not
 create these itself, same reasoning as `secrets/dev/` above.
+
+## 5. AWS production / DR (STOCK-6 — Floci only, for now)
+
+```bash
+cd environments/aws-production   # or environments/aws-dr
+terragrunt init
+terragrunt apply
+```
+
+Not phased with, or dependent on, anything above — independent of the
+homelab environments and of each other. Currently just the
+`aws-environment` module's smoke-test `aws_s3_bucket`, proving the
+Terragrunt → `aws` provider → Floci wiring works, per
+`../docs/adr/0004-aws-production-dr-architecture.md`'s "validate before
+spend" principle. Both point the `aws` provider at a local Floci instance
+via `floci_endpoint` (`../modules/aws-environment/variables.tf`, defaults
+to `http://localhost:4566` — override `TF_VAR_floci_endpoint` in
+`../.env.local` if Floci isn't running on the default port) plus the
+standard `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` environment variables
+(also in `../.env.local`) — deliberately not `TF_VAR_*`/provider-block
+attributes, since an `aws` provider's `access_key`/`secret_key` attributes
+are themselves a static-analysis finding regardless of whether the value
+is a literal or a variable; the provider's default credential chain picks
+these up on its own with no provider-block config needed. Later AWS
+tickets (EKS, Aurora Global, networking, observability —
+`../docs/adr/0005-aurora-global-database-dr-failover.md` through
+`0008-aws-observability-secrets.md`) build their real resources into
+`../modules/aws-environment/`, replacing the smoke-test resource; a real
+cutover away from Floci drops these env vars in favor of the GitHub OIDC
+auth `../docs/adr/0007-aws-cicd-iac.md` already commits to.
 
 ## Why Terraform here, and why split this way
 
