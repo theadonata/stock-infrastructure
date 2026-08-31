@@ -99,7 +99,7 @@ automatically after merging to their `main`. Needs:
    Actions).
 3. **In `stock-infrastructure` settings:** enable "Allow auto-merge"
    (Settings → General), and add this repo's CI job names — `secret-scan`,
-   `terraform-fmt`, `terraform-validate`, `helm`, `shellcheck`,
+   `terragrunt-fmt`, `terraform-validate`, `helm`, `shellcheck`,
    `dependency-review`, `iac-scan`, `sonarcloud` — to `main`'s
    required-status-checks (Settings → Branches).
 
