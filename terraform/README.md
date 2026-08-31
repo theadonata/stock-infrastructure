@@ -233,8 +233,13 @@ Terragrunt → `aws` provider → Floci wiring works, per
 `../docs/adr/0004-aws-production-dr-architecture.md`'s "validate before
 spend" principle. Both point the `aws` provider at a local Floci instance
 via `floci_endpoint`/`floci_access_key`/`floci_secret_key`
-(`../modules/aws-environment/variables.tf`) — override `TF_VAR_floci_endpoint`
-in `../.env.local` if Floci isn't running on the default port. Later AWS
+(`../modules/aws-environment/variables.tf`) — `floci_endpoint` defaults to
+`http://localhost:4566` (override `TF_VAR_floci_endpoint` in `../.env.local`
+if Floci isn't running on the default port), but `floci_access_key`/
+`floci_secret_key` have no default on purpose (a committed credential-shaped
+literal, even a fake one, is a static-analysis finding) — set
+`TF_VAR_floci_access_key`/`TF_VAR_floci_secret_key` in `../.env.local`
+before running `terragrunt plan`/`apply` here. Later AWS
 tickets (EKS, Aurora Global, networking, observability —
 `../docs/adr/0005-aurora-global-database-dr-failover.md` through
 `0008-aws-observability-secrets.md`) build their real resources into
