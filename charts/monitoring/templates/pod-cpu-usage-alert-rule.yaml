@@ -1,0 +1,62 @@
+# Custom alert, not part of kube-prometheus-stack's built-in defaultRules:
+# per-container CPU usage vs. its own resource limit, sustained over time.
+# See docs/adr/0003-observability-stack.md and CONTEXT.md's "Alert
+# severity"/"Resource-category routing" entries for the design reasoning
+# (two severities only, sustained-threshold not rate-of-change, routed to
+# its own Discord channel rather than the default flat receiver).
+#
+# `release: monitoring` matches the Prometheus CR's ruleSelector
+# (spec.ruleSelector.matchLabels — see values.yaml's kube-prometheus-stack
+# block) — without this label Prometheus never picks the rule up, even
+# though Argo CD would still show it as synced.
+#
+# annotations below use Prometheus's own Go template syntax (referencing
+# $labels/$value), meant to be evaluated by Prometheus per-alert at eval
+# time, not by Helm at chart-render time — wrapped in Go backtick raw
+# strings so Helm (this file lives under templates/, so it's
+# Helm-templated too) emits them literally instead of trying to resolve
+# those variables itself.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pod-cpu-usage-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: pod-cpu-usage
+      rules:
+        - alert: PodCPUUsageHigh
+          # container!="" / !="POD" excludes the per-pod aggregate series
+          # and the sandbox/pause container — same exclusion kube-state-metrics'
+          # own container-cpu-usage-second recording rule uses.
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{container!="", container!="POD"}[5m])) by (namespace, pod, container)
+            /
+            sum(kube_pod_container_resource_limits{resource="cpu"}) by (namespace, pod, container)
+            > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            resource_category: cpu-memory
+          annotations:
+            summary: {{ `{{ $labels.pod }}/{{ $labels.container }} CPU usage is high` | quote }}
+            description: {{ `Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has used {{ $value | humanizePercentage }} of its CPU limit for more than 10 minutes.` | quote }}
+            runbook_url: "https://github.com/theadonata/stock-infrastructure/blob/main/runbook.md#alerts"
+            dashboard_url: "http://grafana.dev.lan"
+        - alert: PodCPUUsageHigh
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{container!="", container!="POD"}[5m])) by (namespace, pod, container)
+            /
+            sum(kube_pod_container_resource_limits{resource="cpu"}) by (namespace, pod, container)
+            > 0.95
+          for: 5m
+          labels:
+            severity: critical
+            resource_category: cpu-memory
+          annotations:
+            summary: {{ `{{ $labels.pod }}/{{ $labels.container }} CPU usage is critically high` | quote }}
+            description: {{ `Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has used {{ $value | humanizePercentage }} of its CPU limit for more than 5 minutes.` | quote }}
+            runbook_url: "https://github.com/theadonata/stock-infrastructure/blob/main/runbook.md#alerts"
+            dashboard_url: "http://grafana.dev.lan"

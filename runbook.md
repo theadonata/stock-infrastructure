@@ -451,6 +451,39 @@ kubectl rollout restart deployment -n monitoring monitoring-grafana
 ```
 Alertmanager reloads its config on its own — no restart needed.
 
+### Alerts
+
+Alertmanager routes by **resource category** (a Discord channel per
+category), not by severity — severity (`warning`/`critical`) only shows up
+inside the message text. See `CONTEXT.md`'s "Alert severity"/
+"Resource-category routing" entries before assuming an alert has its own
+channel: most of kube-prometheus-stack's 150+ built-in default alerts
+(`KubePodCrashLooping`, `KubePersistentVolumeFillingUp`, etc.) are *not*
+categorized and still land on the flat `discord` receiver.
+
+**`PodCPUUsageHigh`** (`charts/monitoring/templates/pod-cpu-usage-alert-rule.yaml`)
+— the first, and so far only, alert routed by category:
+- Fires per-container, when usage exceeds a percentage of that container's
+  own CPU *limit*, sustained (not a rate-of-change/anomaly check):
+  `warning` at 85% for 10m, `critical` at 95% for 5m.
+- Goes to the `discord-cpu-memory` receiver/channel, separate from every
+  other alert's `discord` channel — needs its own webhook: set
+  `CPU_MEMORY_DISCORD_WEBHOOK_URL` in `.env.local` (create the Discord
+  channel first, then Integrations → Webhooks there), same rotation
+  process as above.
+- **When it fires:** check which pod/namespace/container is named in the
+  message, then `kubectl top pod -n <namespace> <pod>` and the "Kubernetes
+  / Compute Resources / Pod" Grafana dashboard to see if it's a genuine
+  sustained load increase (traffic, a slow query, a stuck loop) or just
+  that container's limit being set too tight for normal peak load. If it's
+  the latter, raise the limit in `charts/stock-hpp/values.yaml` rather than
+  treating it as an incident.
+- Adding more categorized alerts later: give the new `PrometheusRule`'s
+  labels a `resource_category` value, add a matching route + receiver in
+  `scripts/generate-monitoring-secrets.sh`'s `alertmanager_config` (and
+  mirror it in `charts/monitoring/README.md`'s by-hand example), and a new
+  `..._DISCORD_WEBHOOK_URL` var in `.env.local`.
+
 ---
 
 ## Glossary
