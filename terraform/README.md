@@ -232,20 +232,21 @@ homelab environments and of each other. Currently just the
 Terragrunt → `aws` provider → Floci wiring works, per
 `../docs/adr/0004-aws-production-dr-architecture.md`'s "validate before
 spend" principle. Both point the `aws` provider at a local Floci instance
-via `floci_endpoint`/`floci_access_key`/`floci_secret_key`
-(`../modules/aws-environment/variables.tf`) — `floci_endpoint` defaults to
-`http://localhost:4566` (override `TF_VAR_floci_endpoint` in `../.env.local`
-if Floci isn't running on the default port), but `floci_access_key`/
-`floci_secret_key` have no default on purpose (a committed credential-shaped
-literal, even a fake one, is a static-analysis finding) — set
-`TF_VAR_floci_access_key`/`TF_VAR_floci_secret_key` in `../.env.local`
-before running `terragrunt plan`/`apply` here. Later AWS
+via `floci_endpoint` (`../modules/aws-environment/variables.tf`, defaults
+to `http://localhost:4566` — override `TF_VAR_floci_endpoint` in
+`../.env.local` if Floci isn't running on the default port) plus the
+standard `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` environment variables
+(also in `../.env.local`) — deliberately not `TF_VAR_*`/provider-block
+attributes, since an `aws` provider's `access_key`/`secret_key` attributes
+are themselves a static-analysis finding regardless of whether the value
+is a literal or a variable; the provider's default credential chain picks
+these up on its own with no provider-block config needed. Later AWS
 tickets (EKS, Aurora Global, networking, observability —
 `../docs/adr/0005-aurora-global-database-dr-failover.md` through
 `0008-aws-observability-secrets.md`) build their real resources into
 `../modules/aws-environment/`, replacing the smoke-test resource; a real
-cutover away from Floci drops the `floci_*` variables in favor of the
-GitHub OIDC auth `../docs/adr/0007-aws-cicd-iac.md` already commits to.
+cutover away from Floci drops these env vars in favor of the GitHub OIDC
+auth `../docs/adr/0007-aws-cicd-iac.md` already commits to.
 
 ## Why Terraform here, and why split this way
 
