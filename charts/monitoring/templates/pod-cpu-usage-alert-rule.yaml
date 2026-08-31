@@ -44,7 +44,7 @@ spec:
             summary: {{ `{{ $labels.pod }}/{{ $labels.container }} CPU usage is high` | quote }}
             description: {{ `Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has used {{ $value | humanizePercentage }} of its CPU limit for more than 10 minutes.` | quote }}
             runbook_url: "https://github.com/theadonata/stock-infrastructure/blob/main/runbook.md#alerts"
-            dashboard_url: "http://grafana.dev.lan"
+            dashboard_url: "http://grafana.dev.lan" # NOSONAR: plain HTTP is deliberate here, not an oversight — see docs/adr/0003-observability-stack.md ("no additional auth layer, acceptable because this cluster isn't internet-reachable"); the same grafana.dev.lan host already serves over plain HTTP today (values.yaml's Traefik Ingress has no TLS configured).
         - alert: PodCPUUsageHigh
           expr: |
             sum(rate(container_cpu_usage_seconds_total{container!="", container!="POD"}[5m])) by (namespace, pod, container)
@@ -59,4 +59,4 @@ spec:
             summary: {{ `{{ $labels.pod }}/{{ $labels.container }} CPU usage is critically high` | quote }}
             description: {{ `Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has used {{ $value | humanizePercentage }} of its CPU limit for more than 5 minutes.` | quote }}
             runbook_url: "https://github.com/theadonata/stock-infrastructure/blob/main/runbook.md#alerts"
-            dashboard_url: "http://grafana.dev.lan"
+            dashboard_url: "http://grafana.dev.lan" # NOSONAR: plain HTTP is deliberate here, not an oversight — see docs/adr/0003-observability-stack.md ("no additional auth layer, acceptable because this cluster isn't internet-reachable"); the same grafana.dev.lan host already serves over plain HTTP today (values.yaml's Traefik Ingress has no TLS configured).

@@ -54,7 +54,7 @@ set -a
 source "$ENV_LOCAL"
 set +a
 
-if [ -z "${GRAFANA_ADMIN_USER:-}" ] || [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ] || [ -z "${DISCORD_WEBHOOK_URL:-}" ] || [ -z "${CPU_MEMORY_DISCORD_WEBHOOK_URL:-}" ]; then
+if [[ -z "${GRAFANA_ADMIN_USER:-}" || -z "${GRAFANA_ADMIN_PASSWORD:-}" || -z "${DISCORD_WEBHOOK_URL:-}" || -z "${CPU_MEMORY_DISCORD_WEBHOOK_URL:-}" ]]; then
   echo "ERROR: GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL, and/or CPU_MEMORY_DISCORD_WEBHOOK_URL are missing or empty in $ENV_LOCAL" >&2
   exit 1
 fi
