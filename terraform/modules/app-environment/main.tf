@@ -27,6 +27,7 @@ module "argocd_app" {
   automated_sync        = var.automated_sync
   prune                 = var.prune
   self_heal             = var.self_heal
+  server_side_apply     = var.server_side_apply
 
   depends_on = [module.namespace]
 }

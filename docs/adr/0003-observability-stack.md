@@ -36,6 +36,27 @@ not built by hand in the Grafana UI, so they survive even if Grafana's own
 PVC is ever lost or recreated — the exact failure mode the day's PVC bug
 produced.
 
+## Incident: Prometheus/Alertmanager CRDs never applied
+
+`kube-prometheus-stack` ships several CRDs (`Prometheus`, `Alertmanager`,
+`AlertmanagerConfig`, `PrometheusAgent`, `ScrapeConfig`, `ThanosRuler`)
+whose OpenAPI schemas exceed etcd's 262144-byte
+`kubectl.kubernetes.io/last-applied-configuration` annotation limit under a
+normal client-side apply. Argo CD's sync for those specific objects failed
+silently into a permanent retry loop — smaller CRDs from the same chart
+(`ServiceMonitor`, `PrometheusRule`) applied fine, so the Application showed
+`Healthy` for what it *could* create, masking that no `Prometheus` or
+`Alertmanager` custom resource — and therefore no actual Prometheus
+server — ever existed. Symptom: every Grafana panel showed no data, with no
+obvious error short of reading the Application's own `operationState`.
+
+Fixed with `syncOptions: [ServerSideApply=true]` on the `monitoring`
+Application only (`terraform/environments/monitoring/terragrunt.hcl`'s
+`server_side_apply = true`, plumbed through
+`modules/app-environment`/`modules/argocd-application`) — server-side apply
+doesn't use that annotation at all. `dev`/`staging` don't need it; the
+`stock-hpp` chart ships no CRDs.
+
 ## Consequences
 
 - Upgrading any one tool means bumping a chart dependency version, not

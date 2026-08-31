@@ -65,3 +65,9 @@ variable "self_heal" {
   type        = bool
   default     = true
 }
+
+variable "server_side_apply" {
+  description = "Adds syncOptions: [ServerSideApply=true] — needed by charts whose CRDs exceed etcd's client-side-apply annotation size limit. See modules/argocd-application/variables.tf and docs/adr/0003-observability-stack.md."
+  type        = bool
+  default     = false
+}

@@ -32,4 +32,13 @@ inputs = {
   automated_sync = true
   prune          = true
   self_heal      = true
+  # kube-prometheus-stack ships CRDs (Prometheus, Alertmanager,
+  # AlertmanagerConfig, PrometheusAgent, ScrapeConfig, ThanosRuler) whose
+  # OpenAPI schemas exceed etcd's 262144-byte last-applied-configuration
+  # annotation limit under a normal client-side apply. Without this, those
+  # CRDs — and the Prometheus/Alertmanager custom resources that depend on
+  # them — silently never get created, so no Prometheus server ever runs
+  # and every Grafana panel shows no data. dev/staging don't need this;
+  # stock-hpp ships no CRDs.
+  server_side_apply = true
 }

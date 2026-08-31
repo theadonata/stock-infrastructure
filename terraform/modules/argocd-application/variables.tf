@@ -58,3 +58,9 @@ variable "self_heal" {
   type        = bool
   default     = true
 }
+
+variable "server_side_apply" {
+  description = "Adds syncOptions: [ServerSideApply=true]. Needed by charts (e.g. kube-prometheus-stack) whose CRDs exceed etcd's 262144-byte last-applied-configuration annotation limit under a normal client-side apply — those CRDs, and any CR that depends on them, otherwise never get created. See docs/adr/0003-observability-stack.md."
+  type        = bool
+  default     = false
+}
