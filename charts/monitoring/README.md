@@ -18,10 +18,10 @@ separate Argo CD source — see the ADR's "single-source" reasoning.
 
 ### Generating them (after the Sealed Secrets controller is running)
 
-**Preferred:** set `GRAFANA_ADMIN_PASSWORD` and `DISCORD_WEBHOOK_URL` in
-`.env.local` (see that file's comment — `DISCORD_WEBHOOK_URL` needs a real
-webhook URL from the target Discord channel's Integrations settings, there
-is no default), then run:
+**Preferred:** set `GRAFANA_ADMIN_PASSWORD`, `DISCORD_WEBHOOK_URL`, and
+`CPU_MEMORY_DISCORD_WEBHOOK_URL` in `.env.local` (see that file's comment —
+each webhook URL needs a real webhook from its target Discord channel's
+Integrations settings, there is no default), then run:
 
 ```bash
 ./scripts/generate-monitoring-secrets.sh
@@ -40,11 +40,16 @@ kubectl create secret generic monitoring-grafana-admin \
     --controller-name=sealed-secrets --controller-namespace=sealed-secrets \
   > templates/grafana-admin-secret.sealed.yaml
 
-# Alertmanager's full config, including the Discord receiver — the key
+# Alertmanager's full config, including both Discord receivers — the key
 # must be exactly "alertmanager.yaml", the name
 # alertmanager.alertmanagerSpec.configSecret in values.yaml expects. Piped
-# through /dev/stdin, not a temp file, so the real webhook URL never
-# touches disk in plaintext (same as scripts/generate-monitoring-secrets.sh).
+# through /dev/stdin, not a temp file, so the real webhook URLs never
+# touch disk in plaintext (same as scripts/generate-monitoring-secrets.sh).
+#
+# The `discord-cpu-memory` receiver + its route (matching alerts labeled
+# resource_category="cpu-memory") is the first alert routed by category —
+# see CONTEXT.md's "Resource-category routing" entry. Everything else
+# still falls through to the flat `discord` receiver.
 cat <<'EOF' | kubectl create secret generic monitoring-alertmanager-config \
   --namespace monitoring \
   --from-file=alertmanager.yaml=/dev/stdin \
@@ -60,10 +65,26 @@ route:
   group_interval: 5m
   repeat_interval: 12h
   receiver: discord
+  routes:
+    - matchers:
+        - resource_category = "cpu-memory"
+      receiver: discord-cpu-memory
 receivers:
   - name: discord
     discord_configs:
       - webhook_url: '<real-discord-webhook-url>'
+  - name: discord-cpu-memory
+    discord_configs:
+      - webhook_url: '<real-cpu-memory-discord-webhook-url>'
+        title: '{{ .CommonLabels.alertname }} — {{ .CommonLabels.severity | toUpper }} ({{ .Status }})'
+        message: |-
+          {{ range .Alerts -}}
+          **Pod:** {{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }})
+          **Status:** {{ .Status }}
+          {{ .Annotations.description }}
+          Dashboard: {{ .Annotations.dashboard_url }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
 EOF
 ```
 

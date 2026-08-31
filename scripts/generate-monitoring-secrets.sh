@@ -12,8 +12,8 @@
 # the chart itself, not a second source.
 #
 # Requires:
-#   - .env.local with GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, and
-#     DISCORD_WEBHOOK_URL set.
+#   - .env.local with GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD,
+#     DISCORD_WEBHOOK_URL, and CPU_MEMORY_DISCORD_WEBHOOK_URL set.
 #   - kubeseal able to reach the cluster's Sealed Secrets controller, i.e.
 #     terraform/environments/bootstrap must already be applied.
 #
@@ -32,8 +32,8 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/generate-monitoring-secrets.sh
 
-Reads GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, and DISCORD_WEBHOOK_URL
-from .env.local and writes
+Reads GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL, and
+CPU_MEMORY_DISCORD_WEBHOOK_URL from .env.local and writes
 charts/monitoring/templates/{grafana-admin,alertmanager-config}-secret.sealed.yaml.
 EOF
 }
@@ -54,8 +54,8 @@ set -a
 source "$ENV_LOCAL"
 set +a
 
-if [ -z "${GRAFANA_ADMIN_USER:-}" ] || [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ] || [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
-  echo "ERROR: GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, and/or DISCORD_WEBHOOK_URL are missing or empty in $ENV_LOCAL" >&2
+if [[ -z "${GRAFANA_ADMIN_USER:-}" || -z "${GRAFANA_ADMIN_PASSWORD:-}" || -z "${DISCORD_WEBHOOK_URL:-}" || -z "${CPU_MEMORY_DISCORD_WEBHOOK_URL:-}" ]]; then
+  echo "ERROR: GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL, and/or CPU_MEMORY_DISCORD_WEBHOOK_URL are missing or empty in $ENV_LOCAL" >&2
   exit 1
 fi
 
@@ -82,6 +82,15 @@ echo "Generating $OUT_DIR/alertmanager-config-secret.sealed.yaml for namespace $
 # variable and fed to kubectl via /dev/stdin (not a temp file) so the
 # webhook URL never touches disk in plaintext, same invariant as the
 # grafana-admin secret above.
+#
+# One extra route+receiver beyond the flat default: alerts carrying
+# resource_category="cpu-memory" (currently just PodCPUUsageHigh — see
+# charts/monitoring/templates/pod-cpu-usage-alert-rule.yaml) go to their
+# own Discord channel instead. This is the first alert routed by category
+# — see CONTEXT.md's "Resource-category routing" entry before assuming
+# every alert has its own channel; most still land on the flat `discord`
+# receiver below. Severity is deliberately not a routing key (same entry)
+# — it only shows up inside the message template.
 alertmanager_config="global:
   resolve_timeout: 5m
 route:
@@ -90,10 +99,26 @@ route:
   group_interval: 5m
   repeat_interval: 12h
   receiver: discord
+  routes:
+    - matchers:
+        - resource_category = \"cpu-memory\"
+      receiver: discord-cpu-memory
 receivers:
   - name: discord
     discord_configs:
       - webhook_url: '$DISCORD_WEBHOOK_URL'
+  - name: discord-cpu-memory
+    discord_configs:
+      - webhook_url: '$CPU_MEMORY_DISCORD_WEBHOOK_URL'
+        title: '{{ .CommonLabels.alertname }} — {{ .CommonLabels.severity | toUpper }} ({{ .Status }})'
+        message: |-
+          {{ range .Alerts -}}
+          **Pod:** {{ .Labels.namespace }}/{{ .Labels.pod }} ({{ .Labels.container }})
+          **Status:** {{ .Status }}
+          {{ .Annotations.description }}
+          Dashboard: {{ .Annotations.dashboard_url }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
 "
 
 printf '%s' "$alertmanager_config" \

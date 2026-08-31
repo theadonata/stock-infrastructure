@@ -70,3 +70,29 @@ automated-failover trigger (see the AWS deployment ADRs) and must stay
 independent of anything running inside the primary region's own cluster.
 _Avoid_: "monitoring stack" unqualified — always say "AWS observability
 stack" to distinguish it from the homelab's Prometheus/Grafana/Loki stack.
+
+**Alert severity** (homelab monitoring stack):
+Two levels only: `critical` (needs action soon) and `warning` (worth
+knowing, not urgent). No `info` tier — matches the "nobody's paged at 3am"
+reasoning already in `charts/monitoring/values.yaml`'s retention comment.
+_Avoid_: introducing a three-tier scheme (`info`/`warning`/`critical`)
+without revisiting this — it was deliberately rejected as more granularity
+than a single-operator setup needs.
+
+**Resource-category routing**:
+Alertmanager receivers for the homelab monitoring stack are split by
+resource category (e.g. `CPU/Memory`, `Availability`, `Capacity`), not by
+severity — severity (above) stays visible inside the message body only,
+it's never a routing key. As of the `PodCPUUsageHigh` alert (the first,
+and so far only, alert routed this way), kube-prometheus-stack's 150+
+built-in default alert rules are *not* re-routed and still land on the
+original flat `discord` receiver from `alertmanager-config-secret.sealed.yaml`.
+_Avoid_: assuming every alert has its own category channel — most don't
+yet; check that file's route tree before assuming otherwise.
+
+**"Spike"**:
+Not project vocabulary — avoid it. A request to alert on a resource
+"spike" was deliberately implemented as a sustained-threshold alert
+(value above X for Y minutes, same mechanism as kube-prometheus-stack's
+own default rules), not rate-of-change/anomaly detection against a
+baseline. Say "sustained-threshold alert."
