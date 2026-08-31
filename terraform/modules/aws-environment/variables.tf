@@ -23,14 +23,12 @@ variable "floci_endpoint" {
 }
 
 variable "floci_access_key" {
-  description = "Placeholder credential Floci expects to see present - it does not perform real authentication. Never a real AWS access key."
+  description = "Placeholder credential Floci expects to see present - it does not perform real authentication. Never a real AWS access key. No default on purpose (a committed credential-shaped literal, even a fake one, is a static-analysis finding) - set via TF_VAR_floci_access_key, e.g. in .env.local."
   type        = string
-  default     = "floci"
 }
 
 variable "floci_secret_key" {
-  description = "Placeholder credential Floci expects to see present - it does not perform real authentication. Never a real AWS secret key."
+  description = "Placeholder credential Floci expects to see present - it does not perform real authentication. Never a real AWS secret key. No default on purpose (a committed credential-shaped literal, even a fake one, is a static-analysis finding) - set via TF_VAR_floci_secret_key, e.g. in .env.local."
   type        = string
-  default     = "floci"
   sensitive   = true
 }
