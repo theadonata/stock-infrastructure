@@ -24,8 +24,9 @@ terraform/
 │   │                             # (those three were byte-identical apart from the
 │   │                             # values passed in)
 │   └── aws-environment/         # root module for environments/{aws-production,aws-dr} —
-│                                 # aws provider pointed at Floci (../docs/adr/0004-...md),
-│                                 # currently just the STOCK-6 prefactor smoke-test resource
+│                                 # aws provider pointed at Floci (../docs/adr/0004-...md);
+│                                 # VPC (one NAT gateway per AZ, ../docs/adr/0006-...md) and
+│                                 # an EKS cluster as of STOCK-7
 └── environments/
     ├── k3s/            # Phase -1 — installs k3s, applied once, before bootstrap
     ├── bootstrap/      # Phase 0 — cluster-wide, applied once, before dev/staging
@@ -218,7 +219,7 @@ values from `../.env.local`) or by hand per
 `../charts/monitoring/README.md` — and commit them; Terraform does not
 create these itself, same reasoning as `secrets/dev/` above.
 
-## 5. AWS production / DR (STOCK-6 — Floci only, for now)
+## 5. AWS production / DR (STOCK-6/7 — Floci only, for now)
 
 ```bash
 cd environments/aws-production   # or environments/aws-dr
@@ -227,26 +228,31 @@ terragrunt apply
 ```
 
 Not phased with, or dependent on, anything above — independent of the
-homelab environments and of each other. Currently just the
-`aws-environment` module's smoke-test `aws_s3_bucket`, proving the
-Terragrunt → `aws` provider → Floci wiring works, per
-`../docs/adr/0004-aws-production-dr-architecture.md`'s "validate before
-spend" principle. Both point the `aws` provider at a local Floci instance
-via `floci_endpoint` (`../modules/aws-environment/variables.tf`, defaults
-to `http://localhost:4566` — override `TF_VAR_floci_endpoint` in
+homelab environments and of each other. As of STOCK-7, this provisions
+each environment's own VPC (multi-AZ, one NAT gateway per AZ —
+`../docs/adr/0006-aws-networking-ingress-registry.md`) and EKS cluster
+(`../docs/adr/0004-aws-production-dr-architecture.md`'s "compute stays
+Kubernetes" decision), replacing STOCK-6's `aws_s3_bucket` smoke test that
+originally proved the Terragrunt → `aws` provider → Floci wiring alone.
+Both point the `aws` provider at a local Floci instance via
+`floci_endpoint` (`../modules/aws-environment/variables.tf`, defaults to
+`http://localhost:4566` — override `TF_VAR_floci_endpoint` in
 `../.env.local` if Floci isn't running on the default port) plus the
 standard `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` environment variables
 (also in `../.env.local`) — deliberately not `TF_VAR_*`/provider-block
 attributes, since an `aws` provider's `access_key`/`secret_key` attributes
 are themselves a static-analysis finding regardless of whether the value
 is a literal or a variable; the provider's default credential chain picks
-these up on its own with no provider-block config needed. Later AWS
-tickets (EKS, Aurora Global, networking, observability —
-`../docs/adr/0005-aurora-global-database-dr-failover.md` through
+these up on its own with no provider-block config needed. The EKS API
+endpoint defaults to private-only (`eks_endpoint_public_access = false`)
+— see that variable's description in
+`../modules/aws-environment/variables.tf` before flipping it on. Later AWS
+tickets (Aurora Global, observability —
+`../docs/adr/0005-aurora-global-database-dr-failover.md`,
 `0008-aws-observability-secrets.md`) build their real resources into
-`../modules/aws-environment/`, replacing the smoke-test resource; a real
-cutover away from Floci drops these env vars in favor of the GitHub OIDC
-auth `../docs/adr/0007-aws-cicd-iac.md` already commits to.
+`../modules/aws-environment/` the same way; a real cutover away from Floci
+drops the Floci env vars in favor of the GitHub OIDC auth
+`../docs/adr/0007-aws-cicd-iac.md` already commits to.
 
 ## Why Terraform here, and why split this way
 

@@ -1,12 +1,11 @@
-# AWS production tier (ADR 0004). STOCK-6 prefactor scaffolding only:
-# wires up Terragrunt + the aws provider against Floci so every later AWS
-# ticket (EKS, Aurora Global, networking, observability - ADRs 0005-0008)
-# has a proven `terragrunt plan/apply` path to build on, with zero real
-# AWS spend, instead of each one re-deriving provider config from scratch.
+# AWS production tier (ADR 0004). STOCK-6 wired up Terragrunt + the aws
+# provider against Floci; STOCK-7 (this) adds the real networking (ADR
+# 0006 - VPC, one NAT gateway per AZ) and EKS cluster (ADR 0004 - "compute
+# stays Kubernetes") into modules/aws-environment. Still zero real AWS
+# spend - everything here still targets Floci, not a real account.
 #
 # Independent of the homelab environments (k3s/bootstrap/dev/staging/
-# monitoring) and of aws-dr - nothing here needs either to exist first
-# (STOCK-6: "Blocked by: None").
+# monitoring) and of aws-dr - nothing here needs either to exist first.
 include "root" {
   path = find_in_parent_folders("root.hcl")
 }
