@@ -23,6 +23,7 @@ provider "aws" {
     # Only what this prefactor's smoke-test resource needs - later AWS
     # tickets add ec2/eks/rds/etc. entries here as they bring those
     # resources in.
-    s3 = var.floci_endpoint
+    s3  = var.floci_endpoint
+    kms = var.floci_endpoint
   }
 }
