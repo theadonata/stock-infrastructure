@@ -62,6 +62,24 @@ Always branch off `main` for new work, and sync first: run
 stale local `main` produces a PR with a stale diff or spurious merge
 conflicts.
 
+## Jira
+
+When picking up a Jira ticket (e.g. `STOCK-*`), always post the resulting
+GitHub PR URL back to that ticket once the PR is open — don't leave the
+Jira card without a pointer to the PR that implements it.
+
+- Prefer setting a `GitHub Pull Request` field on the issue if the project
+  has one (STOCK does — a project-scoped short-text custom field, added via
+  Project settings → Issue types → \<issue type\> layout in the Jira UI, not
+  creatable end-to-end via the REST API for team-managed projects; a
+  field created purely through `POST /rest/api/3/field` has a *global*
+  context and won't be settable on a team-managed project's issues until a
+  human attaches it to that issue type's layout by hand).
+- If no such field exists yet on the project, add a plain comment with the
+  PR link instead — don't block the update on getting a field added first.
+- If a field is later added and a comment already carries the same link,
+  move the value into the field and remove the now-redundant comment.
+
 ## Code style
 
 Always put comments in code (manifests, scripts) so it is understandable by
