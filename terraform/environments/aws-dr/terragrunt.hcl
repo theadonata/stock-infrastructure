@@ -12,5 +12,5 @@ terraform {
 
 inputs = {
   environment_name = "aws-dr"
-  aws_region        = "ap-southeast-1" # Singapore - low-latency APAC pairing, see ADR 0004
+  aws_region       = "ap-southeast-1" # Singapore - low-latency APAC pairing, see ADR 0004
 }

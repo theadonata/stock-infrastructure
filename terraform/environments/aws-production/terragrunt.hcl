@@ -17,5 +17,5 @@ terraform {
 
 inputs = {
   environment_name = "aws-production"
-  aws_region        = "ap-southeast-3" # Jakarta - keeps data in-country, see ADR 0004
+  aws_region       = "ap-southeast-3" # Jakarta - keeps data in-country, see ADR 0004
 }
