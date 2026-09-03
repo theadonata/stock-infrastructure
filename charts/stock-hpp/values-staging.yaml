@@ -5,12 +5,12 @@
 
 backend:
   image:
-    tag: 265ada763a57e85633be9bd2f4b709dae115afdc
+    tag: 102787b597151889e62c8fde6f65fc770d701d59
   env:
     CORS_ORIGINS: "http://stock-hpp.staging.lan,https://stock-hpp.staging.lan"
 frontend:
   image:
-    tag: 8269e93350779c0aa38c290f7dca107839822ea8
+    tag: 5140c2d2c9dd293c64266af7770a952f9eba1e52
   config:
     # Protocol-relative (no scheme), and no /api/v1 -- client.ts appends its
     # own "/api/v1" prefix, and browsers that auto-upgrade http:// page
@@ -21,6 +21,6 @@ frontend:
     apiBaseUrl: "//stock-hpp.staging.lan"
 postgres:
   image:
-    tag: 265ada763a57e85633be9bd2f4b709dae115afdc
+    tag: 102787b597151889e62c8fde6f65fc770d701d59
 ingress:
   host: stock-hpp.staging.lan
