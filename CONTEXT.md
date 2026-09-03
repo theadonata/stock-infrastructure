@@ -90,6 +90,32 @@ original flat `discord` receiver from `alertmanager-config-secret.sealed.yaml`.
 _Avoid_: assuming every alert has its own category channel — most don't
 yet; check that file's route tree before assuming otherwise.
 
+**Floci**:
+A local, free AWS API emulator ([github.com/floci-io/floci](https://github.com/floci-io/floci))
+used to validate the entire AWS production/DR architecture — Terraform,
+Terragrunt, EKS, Aurora Global — before any real, billable AWS account is
+provisioned (`0004-aws-production-dr-architecture.md`). As of
+`0009-aws-finops-cost-guardrails.md`, also the basis for pre-cutover cost
+estimation: Terraform plans run against Floci feed Infracost to produce a
+projected AWS bill before real spend exists.
+_Avoid_: confusing it with a cost-management/FinOps tool itself — Floci is
+an infrastructure emulator; Infracost is the cost-estimation layer built
+on top of what it validates.
+
+**FinOps guardrails**:
+The visibility+alerting half of this project's AWS cost governance
+(`0009-aws-finops-cost-guardrails.md`) — deliberately scoped to exclude
+automated cost optimization (rightsizing, Savings Plans, auto-scaling on
+budget breach; that's a later phase, not this one). Two parts: (1)
+pre-cutover cost estimation via **Floci** + Infracost against Terraform
+plans, and (2) post-cutover **AWS Budgets** (tag-filtered by
+`environment`/`component`, reusing the existing `{app, environment}`
+vocabulary — see "Bump job" above) notifying a dedicated Discord channel.
+_Avoid_: assuming a budget breach triggers any automated action — it's
+notify-only by deliberate choice, since DR's warm-standby topology
+(`0004`/`0005`) must never be silently touched by cost-driven automation,
+matching this project's human-gated-apply philosophy (`0007`).
+
 **"Spike"**:
 Not project vocabulary — avoid it. A request to alert on a resource
 "spike" was deliberately implemented as a sustained-threshold alert
