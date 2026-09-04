@@ -83,6 +83,28 @@ Jira card without a pointer to the PR that implements it.
 - If a field is later added and a comment already carries the same link,
   move the value into the field and remove the now-redundant comment.
 
+## Terraform module structure
+
+Always separate Terraform modules by infrastructure component — one
+`terraform/modules/<component>/` per component (e.g. `vpc`, `eks`, `k3s`,
+`argocd`, `namespace`), never several unrelated components' resources
+sharing one module because they happened to land in the same ticket. A
+`*-environment` root module (what Terragrunt's `terraform.source` actually
+points at, e.g. `modules/aws-environment`) should only instantiate
+component modules and wire their inputs/outputs together — it holds no
+`resource`/`data` blocks of its own. See `terraform/README.md`'s "Module
+structure" section for the full rationale and the precedent (`vpc.tf`/
+`eks.tf` briefly lived inline in `modules/aws-environment` before being
+split into `modules/vpc`/`modules/eks`).
+
+When splitting an existing inline resource out into its own module (or
+adding a new component), add `moved` blocks (see
+`terraform/modules/aws-environment/moved.tf` for the pattern) so
+`terragrunt plan` shows zero diff against any already-applied environment
+— don't rely on `terraform state mv` run by hand, and don't skip this step
+because "nothing's been applied yet" (verify that assumption, don't assume
+it).
+
 ## Code style
 
 Always put comments in code (manifests, scripts) so it is understandable by
