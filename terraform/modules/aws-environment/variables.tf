@@ -30,9 +30,9 @@ variable "az_count" {
 # --- EKS (STOCK-7, ADR 0004 "compute stays Kubernetes") ---
 
 variable "eks_cluster_version" {
-  description = "Kubernetes version for the EKS control plane. Pinned rather than left floating - see terraform/README.md's \"Provider versions\" note on why this project pins deliberately."
+  description = "Kubernetes version for the EKS control plane. Pinned rather than left floating - see terraform/README.md's \"Provider versions\" note on why this project pins deliberately. Bumped by hand to the latest EKS-supported version after checking release notes, not automatically."
   type        = string
-  default     = "1.31"
+  default     = "1.36"
 }
 
 variable "eks_endpoint_public_access" {
