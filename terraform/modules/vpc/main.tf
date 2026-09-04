@@ -65,10 +65,17 @@ resource "aws_internet_gateway" "this" {
 resource "aws_subnet" "public" {
   count = var.az_count
 
-  vpc_id                  = aws_vpc.this.id
-  availability_zone       = local.azs[count.index]
-  cidr_block              = local.public_subnet_cidrs[count.index]
-  map_public_ip_on_launch = true # Trivy AWS-0164 accepts this only for subnets that are genuinely public-facing, which this is
+  vpc_id            = aws_vpc.this.id
+  availability_zone = local.azs[count.index]
+  cidr_block        = local.public_subnet_cidrs[count.index]
+
+  # Trivy AWS-0164: don't auto-assign public IPs at the subnet level. Left
+  # off (the secure default) rather than suppressed - nothing here needs
+  # it. NAT gateways (this file) get their own EIP regardless of this
+  # setting, and a future ALB (ADR 0006) gets its own public IP the same
+  # way; this only matters for a bare EC2 instance launched into the
+  # subnet without an explicit public IP, and nothing does that.
+  map_public_ip_on_launch = false
 
   tags = {
     Name                     = "stock-hpp-${var.environment_name}-public-${local.azs[count.index]}"
