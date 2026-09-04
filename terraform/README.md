@@ -294,6 +294,7 @@ Bump them by hand after checking release notes, not automatically.
 | `hashicorp/helm` provider | `~> 2.14` → 2.17.0 | **3.2.0** | intentionally behind — see below |
 | `hashicorp/null` provider | `~> 3.2` → 3.3.1 | 3.3.1 | current |
 | `gavinbunney/kubectl` provider | `~> 1.14` → 1.19.0 | 1.19.0, but no release since Jan 2025 | current version, project looks unmaintained |
+| EKS control plane (`eks_cluster_version`) | 1.36 (checked 2026-09-04) | 1.36 | current |
 
 **`hashicorp/kubernetes` and `hashicorp/helm` are deliberately capped below
 their v3 majors.** Both v3 releases ship an upgrade guide (breaking
