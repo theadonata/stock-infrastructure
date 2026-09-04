@@ -20,10 +20,14 @@ provider "aws" {
   skip_requesting_account_id  = true
 
   endpoints {
-    # Only what this prefactor's smoke-test resource needs - later AWS
-    # tickets add ec2/eks/rds/etc. entries here as they bring those
-    # resources in.
-    s3  = var.floci_endpoint
+    # STOCK-6's smoke-test resource (s3) is gone as of STOCK-7 - replaced
+    # by the real vpc.tf/eks.tf resources below, which need these instead.
+    # Later AWS tickets (Aurora Global, observability - ADRs 0005/0008) add
+    # further entries here as they bring those resources in.
+    ec2 = var.floci_endpoint
+    eks = var.floci_endpoint
+    iam = var.floci_endpoint
+    sts = var.floci_endpoint
     kms = var.floci_endpoint
   }
 }

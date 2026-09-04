@@ -1,7 +1,7 @@
-# Root module for environments/{aws-production,aws-dr}. Only the `aws`
-# provider is needed at this prefactor stage — later AWS tickets (EKS,
-# Aurora Global, networking, observability - ADRs 0005-0008) will add
-# whatever else their own resources require.
+# Root module for environments/{aws-production,aws-dr}. Networking (vpc.tf)
+# and EKS (eks.tf) as of STOCK-7 - still only the `aws` provider; later AWS
+# tickets (Aurora Global, observability - ADRs 0005/0008) will add whatever
+# else their own resources require.
 terraform {
   required_version = ">= 1.9.0"
 
