@@ -4,9 +4,12 @@ This is the **infrastructure** repo for the Stock/HPP business-finance project.
 
 ## Project status
 
-No cloud provider, IaC tool, or CI/CD platform has been chosen yet and no
-infra code exists. Don't assume one — ask the user before scaffolding
-anything.
+IaC is Terraform + Terragrunt (see `terraform/README.md`), CI/CD is GitHub
+Actions, and the cloud provider is AWS (production/DR — ADR 0004), validated
+against the Floci emulator before any real spend. The homelab tier (dev/
+staging/monitoring) runs on k3s. Don't re-litigate these choices or ask the
+user which platform to use — they're already decided; see `terraform/README.md`
+and `docs/adr/` for the how and why.
 
 ## Relationship to sibling repos
 
