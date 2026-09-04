@@ -71,17 +71,22 @@ When picking up a Jira ticket (e.g. `STOCK-*`), always post the resulting
 GitHub PR URL back to that ticket once the PR is open — don't leave the
 Jira card without a pointer to the PR that implements it.
 
-- Prefer setting a `GitHub Pull Request` field on the issue if the project
-  has one (STOCK does — a project-scoped short-text custom field, added via
-  Project settings → Issue types → \<issue type\> layout in the Jira UI, not
-  creatable end-to-end via the REST API for team-managed projects; a
-  field created purely through `POST /rest/api/3/field` has a *global*
-  context and won't be settable on a team-managed project's issues until a
-  human attaches it to that issue type's layout by hand).
-- If no such field exists yet on the project, add a plain comment with the
-  PR link instead — don't block the update on getting a field added first.
-- If a field is later added and a comment already carries the same link,
-  move the value into the field and remove the now-redundant comment.
+- Always set the **`GitHub Pull Request` field** (`customfield_10046`, a
+  plain short-text field on the STOCK project) to the PR URL —
+  `editJiraIssue` with `fields: {"customfield_10046": "<url>"}` sets it
+  directly; no Jira UI step needed for this (only *creating*/attaching a
+  new custom field to an issue type's layout needs a human — this field
+  already exists and is already attached, confirmed 2026-09-04). If an
+  issue picks up more than one PR over time, list every URL in the field
+  (comma-separated) rather than overwriting with just the latest.
+- Also add a plain comment with the PR link and a short summary of what
+  it does — the field is a quick-glance pointer, the comment is the
+  narrated history of what happened and why. Do both, not one or the
+  other.
+- If a ticket's issue type somehow lacks this field (verify with
+  `getJiraIssue` + `expand: "editmeta"` before assuming it doesn't), fall
+  back to a comment only and don't block the update on getting the field
+  added first.
 
 ## Terraform module structure
 
