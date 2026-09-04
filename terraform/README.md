@@ -23,10 +23,14 @@ terraform/
 │   │                             # parameterized per environment via Terragrunt `inputs`
 │   │                             # (those three were byte-identical apart from the
 │   │                             # values passed in)
+│   ├── vpc/                     # multi-AZ VPC — public/private subnets, one NAT
+│   │                             # gateway per AZ (../docs/adr/0006-...md)
+│   ├── eks/                     # EKS cluster + managed node group, on top of the
+│   │                             # vpc module's subnet outputs
 │   └── aws-environment/         # root module for environments/{aws-production,aws-dr} —
 │                                 # aws provider pointed at Floci (../docs/adr/0004-...md);
-│                                 # VPC (one NAT gateway per AZ, ../docs/adr/0006-...md) and
-│                                 # an EKS cluster as of STOCK-7
+│                                 # wraps modules/vpc + modules/eks, one instance of each
+│                                 # per environment
 └── environments/
     ├── k3s/            # Phase -1 — installs k3s, applied once, before bootstrap
     ├── bootstrap/      # Phase 0 — cluster-wide, applied once, before dev/staging
@@ -234,7 +238,10 @@ each environment's own VPC (multi-AZ, one NAT gateway per AZ —
 (`../docs/adr/0004-aws-production-dr-architecture.md`'s "compute stays
 Kubernetes" decision), replacing STOCK-6's `aws_s3_bucket` smoke test that
 originally proved the Terragrunt → `aws` provider → Floci wiring alone.
-Both point the `aws` provider at a local Floci instance via
+`aws-environment` wires together `../modules/vpc` and `../modules/eks`
+(each a standalone module, not inlined — see this file's "Module
+structure" note below) rather than defining these resources itself. Both
+point the `aws` provider at a local Floci instance via
 `floci_endpoint` (`../modules/aws-environment/variables.tf`, defaults to
 `http://localhost:4566` — override `TF_VAR_floci_endpoint` in
 `../.env.local` if Floci isn't running on the default port) plus the
@@ -249,10 +256,29 @@ endpoint defaults to private-only (`eks_endpoint_public_access = false`)
 `../modules/aws-environment/variables.tf` before flipping it on. Later AWS
 tickets (Aurora Global, observability —
 `../docs/adr/0005-aurora-global-database-dr-failover.md`,
-`0008-aws-observability-secrets.md`) build their real resources into
-`../modules/aws-environment/` the same way; a real cutover away from Floci
-drops the Floci env vars in favor of the GitHub OIDC auth
+`0008-aws-observability-secrets.md`) build their real resources into their
+own dedicated modules (e.g. a future `../modules/aurora/`), wired into
+`../modules/aws-environment/` the same way `../modules/vpc` and
+`../modules/eks` are — see "Module structure" below; a real cutover away
+from Floci drops the Floci env vars in favor of the GitHub OIDC auth
 `../docs/adr/0007-aws-cicd-iac.md` already commits to.
+
+## Module structure
+
+Every `modules/*` directory (other than the `*-environment` root modules
+Terragrunt actually points `terraform.source` at) is scoped to exactly one
+infrastructure component — `vpc`, `eks`, `k3s`, `argocd`, `namespace`, and
+so on — never a grab-bag of unrelated resources sharing a directory because
+they happened to land in the same ticket. A `*-environment` root module's
+`main.tf` does nothing but instantiate those component modules and wire
+their inputs/outputs together (see `modules/aws-environment/main.tf`); the
+components themselves hold the real `resource`/`data` blocks. `vpc.tf` and
+`eks.tf` briefly lived directly inside `modules/aws-environment` (STOCK-7)
+before this split — see `modules/aws-environment/moved.tf` for the
+`moved` blocks that migration needed to keep `terragrunt plan` a no-op
+against already-applied state. Apply the same discipline going forward:
+a new AWS resource type gets its own `modules/<component>/`, not another
+file bolted onto an existing environment module.
 
 ## Why Terraform here, and why split this way
 

@@ -1,9 +1,13 @@
 # Primary-region (and DR-region) networking - STOCK-7, ADR 0004's
 # multi-AZ topology and ADR 0006's "one NAT gateway per AZ" decision.
-# One instance of this file's resources per environment (aws-production,
-# aws-dr), parameterized via var.aws_region / var.vpc_cidr / var.az_count -
-# same shared-module-plus-terragrunt-inputs pattern as the homelab
-# environments (see terraform/README.md).
+# One instance of this module per environment (aws-production, aws-dr),
+# parameterized via var.vpc_cidr / var.az_count - same shared-module-plus-
+# terragrunt-inputs pattern as the homelab environments (see
+# terraform/README.md). Originally lived directly in modules/aws-environment
+# as vpc.tf; split into its own module per CLAUDE.md's "one module per
+# infrastructure component" convention - see modules/aws-environment/main.tf
+# for how this is wired in, and modules/aws-environment/moved.tf for the
+# state-address migration this split needed.
 
 # Picks az_count AZs out of whatever the region actually has. Deliberately
 # not hardcoded (e.g. "ap-southeast-3a") - the two regions this module runs
