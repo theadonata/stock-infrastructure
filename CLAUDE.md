@@ -4,9 +4,12 @@ This is the **infrastructure** repo for the Stock/HPP business-finance project.
 
 ## Project status
 
-No cloud provider, IaC tool, or CI/CD platform has been chosen yet and no
-infra code exists. Don't assume one — ask the user before scaffolding
-anything.
+IaC is Terraform + Terragrunt (see `terraform/README.md`), CI/CD is GitHub
+Actions, and the cloud provider is AWS (production/DR — ADR 0004), validated
+against the Floci emulator before any real spend. The homelab tier (dev/
+staging/monitoring) runs on k3s. Don't re-litigate these choices or ask the
+user which platform to use — they're already decided; see `terraform/README.md`
+and `docs/adr/` for the how and why.
 
 ## Relationship to sibling repos
 
@@ -79,6 +82,28 @@ Jira card without a pointer to the PR that implements it.
   PR link instead — don't block the update on getting a field added first.
 - If a field is later added and a comment already carries the same link,
   move the value into the field and remove the now-redundant comment.
+
+## Terraform module structure
+
+Always separate Terraform modules by infrastructure component — one
+`terraform/modules/<component>/` per component (e.g. `vpc`, `eks`, `k3s`,
+`argocd`, `namespace`), never several unrelated components' resources
+sharing one module because they happened to land in the same ticket. A
+`*-environment` root module (what Terragrunt's `terraform.source` actually
+points at, e.g. `modules/aws-environment`) should only instantiate
+component modules and wire their inputs/outputs together — it holds no
+`resource`/`data` blocks of its own. See `terraform/README.md`'s "Module
+structure" section for the full rationale and the precedent (`vpc.tf`/
+`eks.tf` briefly lived inline in `modules/aws-environment` before being
+split into `modules/vpc`/`modules/eks`).
+
+When splitting an existing inline resource out into its own module (or
+adding a new component), add `moved` blocks (see
+`terraform/modules/aws-environment/moved.tf` for the pattern) so
+`terragrunt plan` shows zero diff against any already-applied environment
+— don't rely on `terraform state mv` run by hand, and don't skip this step
+because "nothing's been applied yet" (verify that assumption, don't assume
+it).
 
 ## Code style
 

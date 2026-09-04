@@ -1,6 +1,25 @@
 # EKS cluster - STOCK-7, ADR 0004 ("compute stays Kubernetes", both
 # primary and DR regions run EKS) and ADR 0006 (ALB ingress / ECR, which
 # builds on top of this cluster in a later ticket - not this one).
+# Originally lived directly in modules/aws-environment as eks.tf (plus the
+# KMS key below, which lived in that module's main.tf); split into its own
+# module per CLAUDE.md's "one module per infrastructure component"
+# convention - see modules/aws-environment/main.tf for how this is wired
+# in, and modules/aws-environment/moved.tf for the state-address migration
+# this split needed. Takes the vpc module's subnet outputs as inputs
+# rather than reaching into that module's resources directly.
+
+# Customer-managed KMS key for this environment (Trivy AWS-0132 pattern
+# already established by STOCK-6: encrypt with a CMK instead of an
+# AWS-managed default, for auditability/key-rotation control). Reused by
+# both the cluster's secrets envelope encryption and the node group's EBS
+# volumes, rather than minting a key per resource - this is a
+# single-app-per-environment cluster, not a multi-tenant one where blast
+# radius would argue for separating them.
+resource "aws_kms_key" "this" {
+  description         = "CMK for the ${var.environment_name} environment (EKS secrets + node EBS encryption)"
+  enable_key_rotation = true
+}
 
 data "aws_iam_policy_document" "eks_cluster_assume_role" {
   statement {
@@ -31,7 +50,7 @@ resource "aws_eks_cluster" "this" {
     # Both public and private subnets: EKS places cross-AZ ENIs for the
     # control plane across whatever subnets it's given, and a future ALB
     # (ADR 0006) needs the public ones anyway.
-    subnet_ids              = concat(aws_subnet.public[*].id, aws_subnet.private[*].id)
+    subnet_ids              = concat(var.public_subnet_ids, var.private_subnet_ids)
     endpoint_private_access = true # always on: in-VPC access (nodes, a future bastion) must never depend on the public toggle below
     endpoint_public_access  = var.eks_endpoint_public_access
     public_access_cidrs     = var.eks_endpoint_public_access ? var.eks_public_access_cidrs : ["127.0.0.1/32"] # Trivy AWS-0039 flags 0.0.0.0/0 even when public access is off; this is inert but keeps the field's default off the scanner's radar
@@ -138,7 +157,7 @@ resource "aws_eks_node_group" "this" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "stock-hpp-${var.environment_name}"
   node_role_arn   = aws_iam_role.eks_node.arn
-  subnet_ids      = aws_subnet.private[*].id # workers stay private - only the NAT path (vpc.tf) gets them outbound
+  subnet_ids      = var.private_subnet_ids # workers stay private - only the NAT path (vpc module) gets them outbound
   instance_types  = var.eks_node_instance_types
   # Required whenever the launch template above doesn't specify an AMI
   # itself (it doesn't, on purpose - see that resource's comment) - tells
