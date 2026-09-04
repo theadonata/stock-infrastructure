@@ -91,9 +91,17 @@ Jira card without a pointer to the PR that implements it.
 ## Terraform module structure
 
 Always separate Terraform modules by infrastructure component — one
-`terraform/modules/<component>/` per component (e.g. `vpc`, `eks`, `k3s`,
-`argocd`, `namespace`), never several unrelated components' resources
-sharing one module because they happened to land in the same ticket. A
+`terraform/modules/<component>/` per component (e.g. `vpc`, `eks`, `iam`,
+`security-group`, `k3s`, `argocd`, `namespace`), never several unrelated
+components' resources sharing one module because they happened to land in
+the same ticket. This applies from the start of a new piece of Terragrunt
+work, not just as a later cleanup: when a ticket needs a new AWS resource
+family (an IAM role, a security group, an RDS/Aurora cluster, an ALB,
+etc.), give it its own `modules/<component>/` up front rather than adding
+it into an existing module (e.g. don't grow `modules/eks` to also hold a
+security group `modules/eks` doesn't otherwise own) — component modules
+can still depend on each other's outputs (an `eks` module consuming a
+`security-group` module's ID, say) without merging into one file. A
 `*-environment` root module (what Terragrunt's `terraform.source` actually
 points at, e.g. `modules/aws-environment`) should only instantiate
 component modules and wire their inputs/outputs together — it holds no
