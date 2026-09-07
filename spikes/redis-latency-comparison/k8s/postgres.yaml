@@ -1,0 +1,65 @@
+# Throwaway Postgres instance holding a small synthetic dataset — not the
+# real stock-hpp database. emptyDir (not a PVC) is deliberate: this data is
+# meant to disappear the moment the namespace is deleted, matching the
+# spike's disposable nature (see ../use-case.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: redis-spike
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18-alpine
+          env:
+            - name: POSTGRES_USER
+              value: spike_user
+            - name: POSTGRES_PASSWORD
+              value: spike_pass
+            - name: POSTGRES_DB
+              value: spike_db
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "spike_user", "-d", "spike_db"]
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          volumeMounts:
+            # postgres:18+ images store data in a version-specific
+            # subdirectory under /var/lib/postgresql itself (not
+            # .../data) -- mounting at .../data trips their startup check
+            # for a stale pre-18 layout.
+            - name: pgdata
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: pgdata
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: redis-spike
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

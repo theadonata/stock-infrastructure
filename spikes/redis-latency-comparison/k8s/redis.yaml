@@ -1,0 +1,61 @@
+# Redis configured with the two settings that matter most for "how this
+# behaves under real constraints" (per the spike's design discussion):
+# maxmemory + an eviction policy, and matching resource limits. Persistence
+# (RDB/AOF) is deliberately off — --save "" disables snapshotting and
+# --appendonly no keeps AOF off (its own default, set explicitly for
+# clarity) — since this data is disposable and persistence isn't the point
+# of this exercise.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: redis-spike
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          args:
+            - redis-server
+            - --maxmemory
+            - 128mb
+            - --maxmemory-policy
+            - allkeys-lru
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 150Mi
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 2
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: redis-spike
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

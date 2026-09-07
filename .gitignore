@@ -29,3 +29,9 @@ sealed-secrets-key-backup.yaml
 # so the tarballs themselves aren't worth committing; Chart.lock is (same
 # reasoning as .terraform.lock.hcl above — not ignored).
 charts/**/charts/*.tgz
+
+# Repo-specific — Python (see spikes/, first introduced by
+# spikes/redis-latency-comparison/).
+spikes/**/.venv/
+spikes/**/__pycache__/
+spikes/**/*.pyc
