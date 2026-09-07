@@ -1,0 +1,11 @@
+# Dedicated, isolated namespace for this research spike — kept separate
+# from stock-hpp-dev/staging so nothing here is mistaken for real app
+# infra, and so the whole spike is deleted with one
+# `kubectl delete namespace redis-spike` when the learning exercise is done.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis-spike
+  labels:
+    app.kubernetes.io/managed-by: manual
+    purpose: research-spike

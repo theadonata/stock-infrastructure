@@ -116,9 +116,23 @@ notify-only by deliberate choice, since DR's warm-standby topology
 (`0004`/`0005`) must never be silently touched by cost-driven automation,
 matching this project's human-gated-apply philosophy (`0007`).
 
-**"Spike"**:
+**"Spike"** (alerting sense):
 Not project vocabulary — avoid it. A request to alert on a resource
 "spike" was deliberately implemented as a sustained-threshold alert
 (value above X for Y minutes, same mechanism as kube-prometheus-stack's
 own default rules), not rate-of-change/anomaly detection against a
 baseline. Say "sustained-threshold alert."
+_Avoid confusing with_: **Research spike** (below) — same word, unrelated
+meaning.
+
+**Research spike**:
+A time-boxed, disposable technical exploration whose deliverable is a
+written comparison/answer, not a lasting deployment — no ADR, no Terraform
+module, nothing Argo CD reconciles. Lives under `spikes/<name>/` as three
+parts: a use case (the scenario/hypothesis, written up in `use-case.md`
+alongside results once run), a test case (the script/config that runs the
+comparison), and an implementation (whatever minimal infra/code the test
+case needs — typically deployed manually, then torn down). First example:
+`spikes/redis-latency-comparison/`.
+_Avoid_: "spike" unqualified — always say "research spike" to distinguish
+from the alerting sense above.
